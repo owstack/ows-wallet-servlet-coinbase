@@ -1,5 +1,135 @@
 'use strict';
 
+angular.module('owsWalletPlugin.api').factory('Account', function (ApiMessage) {
+
+  /**
+   * Constructor.
+   * @param {string} id - The Coinbase account ID.
+   * @constructor
+   */
+  function Account(id) {
+    var self = this;
+
+    var accountId = id;
+
+    /**
+     * Public functions
+     */
+
+    this.createAddress = function(data) {
+      var request = {
+        method: 'POST',
+        url: '/addresses/' + accountId,
+        data: data,
+        responseObj: {}
+      }
+
+      return new ApiMessage(request).send().then(function(response) {
+        return repsonse;
+
+      }).catch(function(error) {
+        $log.error('Coinbase.createAddress():' + error.message + ', detail:' + error.detail);
+        throw new Error(error.message);
+        
+      });
+    };
+
+    this.buyRequest = function(data) {
+      var request = {
+        method: 'POST',
+        url: '/accounts/buys/' + accountId,
+        data: data,
+        responseObj: {}
+      }
+
+      return new ApiMessage(request).send().then(function(response) {
+        return repsonse;
+
+      }).catch(function(error) {
+        $log.error('Coinbase.buyRequest():' + error.message + ', detail:' + error.detail);
+        throw new Error(error.message);
+        
+      });
+    };
+
+    this.getBuyOrder = function(buyId) {
+      var request = {
+        method: 'GET',
+        url: '/accounts/' + accountId + '/buys/' + buyId,
+        responseObj: {}
+      }
+
+      return new ApiMessage(request).send().then(function(response) {
+        return repsonse;
+
+      }).catch(function(error) {
+        $log.error('Coinbase.getBuyOrder():' + error.message + ', detail:' + error.detail);
+        throw new Error(error.message);
+        
+      });
+    };
+
+    this.sellRequest = function(data) {
+      var request = {
+        method: 'POST',
+        url: '/accounts/' + accountId + '/sells',
+        data: data,
+        responseObj: {}
+      }
+
+      return new ApiMessage(request).send().then(function(response) {
+        return repsonse;
+
+      }).catch(function(error) {
+        $log.error('Coinbase.sellRequest():' + error.message + ', detail:' + error.detail);
+        throw new Error(error.message);
+        
+      });
+    };
+
+    this.getTransaction = function(txId) {
+      var request = {
+        method: 'GET',
+        url: '/account/' + accountId + '/transactions/' + txId,
+        responseObj: {}
+      }
+
+      return new ApiMessage(request).send().then(function(response) {
+        return repsonse;
+
+      }).catch(function(error) {
+        $log.error('Coinbase.getTransaction():' + error.message + ', detail:' + error.detail);
+        throw new Error(error.message);
+        
+      });
+    };
+
+    this.getTransactions = function() {
+      var request = {
+        method: 'GET',
+        url: '/account/' + accountId + '/transactions',
+        data: {},
+        responseObj: {}
+      }
+
+      return new ApiMessage(request).send().then(function(response) {
+        return repsonse;
+
+      }).catch(function(error) {
+        $log.error('Coinbase.getTransactions():' + error.message + ', detail:' + error.detail);
+        throw new Error(error.message);
+        
+      });
+    };
+
+    return this;
+  };
+ 
+  return Account;
+});
+
+'use strict';
+
 angular.module('owsWalletPlugin.api').factory('Coinbase', function (ApiMessage, Session) {
 
   Coinbase.pluginId = 'org.openwalletstack.wallet.plugin.servlet.coinbase';
@@ -19,29 +149,253 @@ angular.module('owsWalletPlugin.api').factory('Coinbase', function (ApiMessage, 
       throw new Error('Could not create instance of Coinbase, check plugin configuration');
     }
 
+    init();
+
     /**
      * Public functions
      */
 
-    /**
-     * Create a new invoice.
-     * @param {Object} data - Payment request data.
-     * @return {Promise<Invoice>} A promise for the invoice.
-     */
-    this.say = function(message) {
+    this.accessApi = function(oauthCode) {
       var request = {
-        method: 'POST',
-        url: '/hello/say',
+        method: 'PUT',
+        url: '/service',
         data: {
-          config: config,
-          data: {
-            message: message
-          }
+          state: 'access-api',
+          oauthCode: oauthCode
         },
-        responseObj: String
+        responseObj: {}
       }
 
-      return new ApiMessage(request).send();
+      return new ApiMessage(request).send().then(function(response) {
+        return repsonse;
+
+      }).catch(function(error) {
+        $log.error('Coinbase.getToken():' + error.message + ', detail:' + error.detail);
+        throw new Error(error.message);
+        
+      });
+    };
+
+    this.accessAccount = function() {
+      var request = {
+        method: 'PUT',
+        url: '/service',
+        data: {
+          state: 'access-account'
+        },
+        responseObj: {}
+      }
+
+      return new ApiMessage(request).send().then(function(response) {
+        return repsonse;
+
+      }).catch(function(error) {
+        $log.error('Coinbase.accessAccount():' + error.message + ', detail:' + error.detail);
+        throw new Error(error.message);
+        
+      });
+    };
+
+    this.logout = function() {
+      var request = {
+        method: 'PUT',
+        url: '/service',
+        data: {
+          state: 'logout'
+        },
+        responseObj: {}
+      }
+
+      return new ApiMessage(request).send().then(function(response) {
+        return repsonse;
+
+      }).catch(function(error) {
+        $log.error('Coinbase.logout():' + error.message + ', detail:' + error.detail);
+        throw new Error(error.message);
+        
+      });
+    };
+
+    this.getUrls = function() {
+      var request = {
+        method: 'GET',
+        url: '/urls',
+        responseObj: {}
+      }
+
+      return new ApiMessage(request).send().then(function(response) {
+        return repsonse;
+
+      }).catch(function(error) {
+        $log.error('Coinbase.getUrls():' + error.message + ', detail:' + error.detail);
+        throw new Error(error.message);
+        
+      });
+    };
+
+    this.getAccount = function(accountId) {
+      var request = {
+        method: 'GET',
+        url: '/accounts/' + accountId,
+        responseObj: {}
+      }
+
+      return new ApiMessage(request).send().then(function(response) {
+        return repsonse;
+
+      }).catch(function(error) {
+        $log.error('Coinbase.getAccount():' + error.message + ', detail:' + error.detail);
+        throw new Error(error.message);
+        
+      });
+    };
+
+    this.getCurrentUser = function() {
+      var request = {
+        method: 'GET',
+        url: '/user',
+        responseObj: {}
+      }
+
+      return new ApiMessage(request).send().then(function(response) {
+        return repsonse;
+
+      }).catch(function(error) {
+        $log.error('Coinbase.getUser():' + error.message + ', detail:' + error.detail);
+        throw new Error(error.message);
+        
+      });
+    };
+
+    this.getPaymentMethods = function() {
+      var request = {
+        method: 'GET',
+        url: '/payment-methods',
+        responseObj: {}
+      }
+
+      return new ApiMessage(request).send().then(function(response) {
+        return repsonse;
+
+      }).catch(function(error) {
+        $log.error('Coinbase.getPaymentMethods():' + error.message + ', detail:' + error.detail);
+        throw new Error(error.message);
+        
+      });
+    };
+
+    this.getPriceInfo = function() {
+      var request = {
+        method: 'GET',
+        url: '/prices',
+        responseObj: {}
+      }
+
+      return new ApiMessage(request).send().then(function(response) {
+        return repsonse;
+
+      }).catch(function(error) {
+        $log.error('Coinbase.getPriceInfo():' + error.message + ', detail:' + error.detail);
+        throw new Error(error.message);
+        
+      });
+    };
+
+    this.buyPrice = function(currency) {
+      var request = {
+        method: 'GET',
+        url: '/prices/buy' + currency,
+        responseObj: {}
+      }
+
+      return new ApiMessage(request).send().then(function(response) {
+        return repsonse;
+
+      }).catch(function(error) {
+        $log.error('Coinbase.buyPrice():' + error.message + ', detail:' + error.detail);
+        throw new Error(error.message);
+        
+      });
+    };
+
+    this.sellPrice = function(currency) {
+      var request = {
+        method: 'GET',
+        url: '/prices/sell' + currency,
+        responseObj: {}
+      }
+
+      return new ApiMessage(request).send().then(function(response) {
+        return repsonse;
+
+      }).catch(function(error) {
+        $log.error('Coinbase.sellPrice():' + error.message + ', detail:' + error.detail);
+        throw new Error(error.message);
+        
+      });
+    };
+
+    this.getPendingTransactions = function() {
+      var request = {
+        method: 'GET',
+        url: '/transactions/pending',
+        responseObj: {}
+      }
+
+      return new ApiMessage(request).send().then(function(response) {
+        return repsonse;
+
+      }).catch(function(error) {
+        $log.error('Coinbase.getPendingTransactions():' + error.message + ', detail:' + error.detail);
+        throw new Error(error.message);
+        
+      });
+    };
+
+    this.savePendingTransaction = function(tx, options) {
+      var request = {
+        method: 'POST',
+        url: '/account/transactions',
+        data: {
+          tx: tx,
+          options: options
+        },
+        responseObj: {}
+      }
+
+      return new ApiMessage(request).send().then(function(response) {
+        return repsonse;
+
+      }).catch(function(error) {
+        $log.error('Coinbase.savePendingTransaction():' + error.message + ', detail:' + error.detail);
+        throw new Error(error.message);
+        
+      });
+    };
+
+    /**
+     * Private functions
+     */
+
+    function init() {
+      var request = {
+        method: 'PUT',
+        url: '/service',
+        data: {
+          state: 'configure',
+          config: config
+        },
+        responseObj: {}
+      }
+
+      return new ApiMessage(request).send().then(function(response) {
+        return repsonse;
+
+      }).catch(function(error) {
+        $log.error('Coinbase.config():' + error.message + ', detail:' + error.detail);
+        throw new Error(error.message);
+        
+      });
     };
 
     return this;

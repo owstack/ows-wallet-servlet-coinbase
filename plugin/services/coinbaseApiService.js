@@ -18,7 +18,7 @@ angular.module('owsWalletPlugin.services').factory('coinbaseApiService', functio
       'Content-Type': 'application/json',
       'Accept': 'application/json'
     }
-  };
+  });
 
   root.init = function(config) {
     setCredentials(config);
@@ -34,12 +34,11 @@ angular.module('owsWalletPlugin.services').factory('coinbaseApiService', functio
 
   root.getToken = function(oauthCode, cb) {
     var data = {
-        grant_type: 'authorization_code',
-        code: oauthCode,
-        client_id: credentials.CLIENT_ID,
-        client_secret: credentials.CLIENT_SECRET,
-        redirect_uri: credentials.REDIRECT_URI
-      }
+      grant_type: 'authorization_code',
+      code: oauthCode,
+      client_id: credentials.CLIENT_ID,
+      client_secret: credentials.CLIENT_SECRET,
+      redirect_uri: credentials.REDIRECT_URI
     };
 
     coinbaseHost.post('oauth/token/', data).then(function(data) {
@@ -323,7 +322,7 @@ angular.module('owsWalletPlugin.services').factory('coinbaseApiService', functio
     credentials.API_VERSION = '2017-10-31';
   };
 
-  function saveToken = function(accessToken, refreshToken, cb) {
+  function saveToken(accessToken, refreshToken, cb) {
     storage.setAccessToken(accessToken).then(function(value) {
 
       return storage.setRefreshToken(refreshToken);
@@ -339,7 +338,7 @@ angular.module('owsWalletPlugin.services').factory('coinbaseApiService', functio
     });
   };
 
-  function createCoinbaseApiSender = function(token) {
+  function createCoinbaseApiSender(token) {
     httpApi = new Http(credentials.API + '/v2/', {
       headers: {
         'Content-Type': 'application/json',
@@ -347,7 +346,7 @@ angular.module('owsWalletPlugin.services').factory('coinbaseApiService', functio
         'CB-VERSION': credentials.API_VERSION,
         'Authorization': 'Bearer ' + token
       }
-    };
+    });
   };
 
   function getErrorsAsString(data) {
