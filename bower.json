@@ -1,0 +1,12 @@
+{
+  "name": "ows-plugin",
+  "keywords": [
+    "ows",
+    "ows wallet",
+    "wallet",
+    "plugin"
+  ],
+  "dependencies": {
+    "ionic": "https://github.com/owstack/ionic-v1.git#ows-release"
+  }
+}

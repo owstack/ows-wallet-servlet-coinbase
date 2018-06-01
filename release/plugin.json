@@ -1,0 +1,48 @@
+{
+  "header": {
+    "id": "org.openwalletstack.wallet.plugin.servlet.coinbase",
+    "kind": "servlet",
+    "name": "Coinbase",
+    "version": "0.0.1",
+    "description": "An OWS Wallet servlet plugin for Coinbase.",
+    "author": "Open Wallet Stack",
+    "url": {
+      "marketing": "https://openwalletstack.org",
+      "support": "https://github.com/owstack/ows-wallet-servlet-coinbase/issues",
+      "privacy": "https://openwalletstack.org/disclaimer",
+      "terms": "https://openwalletstack.org/terms",
+      "git": "https://github.com/owstack/ows-wallet-servlet-coinbase/"
+    },
+    "commitHash": "fatal: "
+  },
+  "permissions": {
+    "delete": false
+  },
+  "galleryImage": "<plugin-path>/img/gallery.png",
+  "previewImage": "<plugin-path>/img/preview.png",
+  "iconImage": "<plugin-path>/img/icon.png",
+  "splashImage": "<plugin-path>/img/splash.png",
+  "store": {
+    "id": "0",
+    "rating": "4+",
+    "price": {
+      "amount": "0",
+      "currency": "USD"
+    },
+    "category": {
+      "primary": "General",
+      "secondary": "OWS"
+    },
+    "keywords": [
+      "ows",
+      "plugin",
+      "servlet"
+    ]
+  },
+  "skins": {
+    "default": {
+      "default": true
+    }
+  },
+  "dependencies": {}
+}
