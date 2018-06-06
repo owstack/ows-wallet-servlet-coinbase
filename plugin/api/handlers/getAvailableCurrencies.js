@@ -1,17 +1,17 @@
 'use strict';
 
-angular.module('owsWalletPlugin.api').service('getCurrentUser', function(coinbaseApiService) {
+angular.module('owsWalletPlugin.api').service('getAvailableCurrencies', function(coinbaseService) {
 
 	var root = {};
 
   root.respond = function(message, callback) {
 
-    coinbaseApiService.getCurrentUser().then(function(response) {
+    coinbaseService.getAvailableCurrencies().then(function(response) {
 
       message.response = {
         statusCode: 200,
         statusText: 'OK',
-        data: account
+        data: response
       };
       return callback(message);
 

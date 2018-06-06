@@ -13,7 +13,7 @@ angular.module('owsWalletPlugin.api').service('getPaymentMethods', function(coin
         statusText: 'OK',
         data: txs
       };
-      return callback(response);
+      return callback(message);
 
     }).catch(function(error) {
 

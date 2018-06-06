@@ -1,12 +1,12 @@
 'use strict';
 
-angular.module('owsWalletPlugin.api').service('service', function(coinbaseService, coinbaseApiService) {
+angular.module('owsWalletPlugin.api').service('service', function(coinbaseApiService) {
 
 	var root = {};
 
   root.respond = function(message, callback) {
     // Request parameters.
-    var data = message.request.data.state;
+    var state = message.request.data.state;
     var oauthCode = message.request.data.oauthCode;
     var pluginConfig = message.request.data.config;
 
@@ -38,20 +38,34 @@ angular.module('owsWalletPlugin.api').service('service', function(coinbaseServic
           return callback(message);
         }
 
-        coinbaseApiService.init(pluginConfig.service);
+        coinbaseApiService.init(pluginConfig, function(err, accountId) {
 
-        message.response = {
-          statusCode: 200,
-          statusText: 'OK',
-          data: data
-        };
-        return callback(response);
+          if (err) {
+            message.response = {
+              statusCode: 500,
+              statusText: 'UNEXPECTED_ERROR',
+              data: {
+                message: err
+              }
+            };
+            return callback(message);
+          }
+
+          message.response = {
+            statusCode: 200,
+            statusText: 'OK',
+            data: accountId
+          };
+          return callback(message);
+
+        });
 
         break;
 
       /**
        * Submit an oauth code to get an API access token.
        */
+/*
       case 'access-api':
         if (!oauthCode) {
           message.response = {
@@ -82,17 +96,17 @@ angular.module('owsWalletPlugin.api').service('service', function(coinbaseServic
             statusText: 'OK',
             data: data
           };
-          return callback(response);
+          return callback(message);
 
         });
 
         break;
-
+*/
       /**
        * Initialize by getting access to the users account.
        */
       case 'access-account':
-        coinbaseService.accessAccount(function(error, data) {
+        coinbaseApiService.getAccountId(function(error, data) {
 
           if (error) {
             message.response = {
@@ -110,7 +124,7 @@ angular.module('owsWalletPlugin.api').service('service', function(coinbaseServic
             statusText: 'OK',
             data: data
           };
-          return callback(response);
+          return callback(message);
 
         });
         break;
@@ -120,14 +134,14 @@ angular.module('owsWalletPlugin.api').service('service', function(coinbaseServic
        */
       case 'logout':
 
-        coinbaseService.logout();
+        coinbaseApiService.logout();
 
         message.response = {
           statusCode: 200,
           statusText: 'OK',
           data: {}
         };
-        return callback(response);
+        return callback(message);
         break;
     }
 	};

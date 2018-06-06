@@ -11,7 +11,7 @@ angular.module('owsWalletPlugin.api').service('getPriceInfo', function(coinbaseS
       statusText: 'OK',
       data: coinbaseService.getPriceSensitivity()
     };
-    return callback(response);
+    return callback(message);
 
 	};
 

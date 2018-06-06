@@ -1,6 +1,6 @@
 'use strict';
 
-angular.module('owsWalletPlugin.api').factory('Account', function (ApiMessage) {
+angular.module('owsWalletPlugin.api').factory('Account', function ($log, ApiMessage) {
 
   /**
    * Constructor.
@@ -25,7 +25,7 @@ angular.module('owsWalletPlugin.api').factory('Account', function (ApiMessage) {
       }
 
       return new ApiMessage(request).send().then(function(response) {
-        return repsonse;
+        return response;
 
       }).catch(function(error) {
         $log.error('Coinbase.createAddress():' + error.message + ', detail:' + error.detail);
@@ -43,7 +43,7 @@ angular.module('owsWalletPlugin.api').factory('Account', function (ApiMessage) {
       }
 
       return new ApiMessage(request).send().then(function(response) {
-        return repsonse;
+        return response;
 
       }).catch(function(error) {
         $log.error('Coinbase.buyRequest():' + error.message + ', detail:' + error.detail);
@@ -60,7 +60,7 @@ angular.module('owsWalletPlugin.api').factory('Account', function (ApiMessage) {
       }
 
       return new ApiMessage(request).send().then(function(response) {
-        return repsonse;
+        return response;
 
       }).catch(function(error) {
         $log.error('Coinbase.getBuyOrder():' + error.message + ', detail:' + error.detail);
@@ -78,7 +78,7 @@ angular.module('owsWalletPlugin.api').factory('Account', function (ApiMessage) {
       }
 
       return new ApiMessage(request).send().then(function(response) {
-        return repsonse;
+        return response;
 
       }).catch(function(error) {
         $log.error('Coinbase.sellRequest():' + error.message + ', detail:' + error.detail);
@@ -95,7 +95,7 @@ angular.module('owsWalletPlugin.api').factory('Account', function (ApiMessage) {
       }
 
       return new ApiMessage(request).send().then(function(response) {
-        return repsonse;
+        return response;
 
       }).catch(function(error) {
         $log.error('Coinbase.getTransaction():' + error.message + ', detail:' + error.detail);
@@ -113,7 +113,7 @@ angular.module('owsWalletPlugin.api').factory('Account', function (ApiMessage) {
       }
 
       return new ApiMessage(request).send().then(function(response) {
-        return repsonse;
+        return response;
 
       }).catch(function(error) {
         $log.error('Coinbase.getTransactions():' + error.message + ', detail:' + error.detail);

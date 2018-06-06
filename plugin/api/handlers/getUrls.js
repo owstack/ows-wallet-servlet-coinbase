@@ -1,6 +1,6 @@
 'use strict';
 
-angular.module('owsWalletPlugin.api').service('getUrls', function(coinbaseService) {
+angular.module('owsWalletPlugin.api').service('getUrls', function(coinbaseApiService) {
 
 	var root = {};
 
@@ -9,9 +9,9 @@ angular.module('owsWalletPlugin.api').service('getUrls', function(coinbaseServic
     message.response = {
       statusCode: 200,
       statusText: 'OK',
-      data: coinbaseService.getUrls()
+      data: coinbaseApiService.getUrls()
     };
-    return callback(response);
+    return callback(message);
 
 	};
 

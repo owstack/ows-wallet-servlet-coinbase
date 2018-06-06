@@ -26,7 +26,7 @@ angular.module('owsWalletPlugin.api').service('getSellPrice', function(coinbaseA
         statusText: 'OK',
         data: account
       };
-      return callback(response);
+      return callback(message);
 
     }).catch(function(error) {
 

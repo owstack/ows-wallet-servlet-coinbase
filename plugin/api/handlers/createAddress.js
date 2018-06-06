@@ -27,7 +27,7 @@ angular.module('owsWalletPlugin.api').service('createAddress', function(coinbase
         statusText: 'OK',
         data: account
       };
-      return callback(response);
+      return callback(message);
 
     }).catch(function(error) {
 
