@@ -1,12 +1,12 @@
 'use strict';
 
-angular.module('owsWalletPlugin.api').service('getPaymentMethods', function(coinbaseApiService) {
+angular.module('owsWalletPlugin.api').service('getPaymentMethods', function(coinbaseService) {
 
 	var root = {};
 
   root.respond = function(message, callback) {
 
-    coinbaseApiService.getPaymentMethods(accountId).then(function(response) {
+    coinbaseService.getPaymentMethods(accountId).then(function(response) {
 
       message.response = {
         statusCode: 200,

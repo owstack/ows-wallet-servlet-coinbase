@@ -1,31 +1,31 @@
 'use strict';
 
-angular.module('owsWalletPlugin.api').service('requestSell', function(coinbaseService) {
+angular.module('owsWalletPlugin.api').service('getHistoricPrice', function(coinbaseService) {
 
-	var root = {};
+  var root = {};
 
   root.respond = function(message, callback) {
     // Request parameters.
-    var accountId = message.request.params.accountId;
-    var data = message.request.data.data;
+    var currencyPair = message.request.params.currencyPair;
+    var period = message.request.params.period;
 
-    if (!accountId) {
+    if (!currencyPair) {
       message.response = {
         statusCode: 500,
         statusText: 'REQUEST_NOT_VALID',
         data: {
-          message: 'Missing required account id.'
+          message: 'Missing required currency pair.'
         }
       };
       return callback(message);
     };
 
-    coinbaseService.requestSell(accountId, data).then(function(response) {
+    coinbaseService.historicPrice(currencyPair, period).then(function(response) {
 
       message.response = {
         statusCode: 200,
         statusText: 'OK',
-        data: account
+        data: response
       };
       return callback(message);
 
@@ -41,7 +41,7 @@ angular.module('owsWalletPlugin.api').service('requestSell', function(coinbaseSe
       return callback(message);
 
     });
-	};
+  };
 
   return root;
 });

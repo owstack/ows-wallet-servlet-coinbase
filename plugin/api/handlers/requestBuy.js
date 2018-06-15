@@ -1,6 +1,6 @@
 'use strict';
 
-angular.module('owsWalletPlugin.api').service('requestBuy', function(coinbaseApiService) {
+angular.module('owsWalletPlugin.api').service('requestBuy', function(coinbaseService) {
 
 	var root = {};
 
@@ -20,7 +20,7 @@ angular.module('owsWalletPlugin.api').service('requestBuy', function(coinbaseApi
       return callback(message);
     };
 
-    coinbaseApiService.requestBuy(accountId, data).then(function(response) {
+    coinbaseService.requestBuy(accountId, data).then(function(response) {
 
       message.response = {
         statusCode: 200,

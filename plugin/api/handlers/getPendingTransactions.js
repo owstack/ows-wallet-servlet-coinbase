@@ -1,6 +1,6 @@
 'use strict';
 
-angular.module('owsWalletPlugin.api').service('getPendingTransactions', function(coinbaseApiService) {
+angular.module('owsWalletPlugin.api').service('getPendingTransactions', function(coinbaseService) {
 
 	var root = {};
 
@@ -11,7 +11,7 @@ angular.module('owsWalletPlugin.api').service('getPendingTransactions', function
       data: {}
     };
 
-    coinbaseApiService.getPendingTransactions(pendingTransactions).then(function() {
+    coinbaseService.getPendingTransactions(pendingTransactions).then(function(pendingTransactions) {
 
       message.response = {
         statusCode: 200,
@@ -20,7 +20,7 @@ angular.module('owsWalletPlugin.api').service('getPendingTransactions', function
       };
       return callback(message);
 
-    }).then(function(error){
+    }).catch(function(error) {
 
       message.response = {
         statusCode: 500,

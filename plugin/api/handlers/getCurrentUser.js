@@ -1,12 +1,12 @@
 'use strict';
 
-angular.module('owsWalletPlugin.api').service('getCurrentUser', function(coinbaseApiService) {
+angular.module('owsWalletPlugin.api').service('getCurrentUser', function(coinbaseService) {
 
 	var root = {};
 
   root.respond = function(message, callback) {
 
-    coinbaseApiService.getCurrentUser().then(function(response) {
+    coinbaseService.getCurrentUser().then(function(response) {
 
       message.response = {
         statusCode: 200,

@@ -1,6 +1,6 @@
 'use strict';
 
-angular.module('owsWalletPlugin.api').service('createAddress', function(coinbaseApiService) {
+angular.module('owsWalletPlugin.api').service('createAddress', function(coinbaseService) {
 
 	var root = {};
 
@@ -20,7 +20,7 @@ angular.module('owsWalletPlugin.api').service('createAddress', function(coinbase
       return callback(message);
     };
 
-    coinbaseApiService.createAddress(accountId, data).then(function(response) {
+    coinbaseService.createAddress(accountId, data).then(function(response) {
 
       message.response = {
         statusCode: 200,

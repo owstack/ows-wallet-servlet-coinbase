@@ -1,6 +1,6 @@
 'use strict';
 
-angular.module('owsWalletPlugin.api').service('service', function(coinbaseApiService) {
+angular.module('owsWalletPlugin.api').service('service', function(coinbaseService) {
 
 	var root = {};
 
@@ -23,9 +23,10 @@ angular.module('owsWalletPlugin.api').service('service', function(coinbaseApiSer
 
     switch (state) {
       /**
-       * Configure the Coinbase environment.
+       * Initialize the Coinbase environment with specified configurtion and attempt to pair to an account
+       * or obtain an account ID if already paired.
        */
-      case 'configure':
+      case 'initialize':
 
         if (!pluginConfig) {
           message.response = {
@@ -38,112 +39,79 @@ angular.module('owsWalletPlugin.api').service('service', function(coinbaseApiSer
           return callback(message);
         }
 
-        coinbaseApiService.init(pluginConfig, function(err, accountId) {
-
-          if (err) {
-            message.response = {
-              statusCode: 500,
-              statusText: 'UNEXPECTED_ERROR',
-              data: {
-                message: err
-              }
-            };
-            return callback(message);
-          }
+        // Initialize service configuration and attempt to get an account ID. If an oauthCode is specified
+        // then it will be used to get the API token followed by the account ID. If an account ID cannot be 
+        // obtained then no error will result and the accountId is undefined.
+        coinbaseService.init(pluginConfig, oauthCode).then(function(data) {
 
           message.response = {
             statusCode: 200,
             statusText: 'OK',
-            data: accountId
+            data: data
           };
           return callback(message);
 
-        });
+        }).catch(function(error) {
 
-        break;
-
-      /**
-       * Submit an oauth code to get an API access token.
-       */
-/*
-      case 'access-api':
-        if (!oauthCode) {
           message.response = {
             statusCode: 500,
-            statusText: 'REQUEST_NOT_VALID',
+            statusText: 'UNEXPECTED_ERROR',
             data: {
-              message: 'Missing required oauth code.'
+              message: error
             }
           };
           return callback(message);
-        }
-
-        coinbaseApiService.getToken(oauthCode, function(error) {
-
-          if (error) {
-            message.response = {
-              statusCode: 500,
-              statusText: 'UNEXPECTED_ERROR',
-              data: {
-                message: error.message
-              }
-            };
-            return callback(message);
-          }
-
-          message.response = {
-            statusCode: 200,
-            statusText: 'OK',
-            data: data
-          };
-          return callback(message);
 
         });
 
         break;
-*/
-      /**
-       * Initialize by getting access to the users account.
-       */
-      case 'access-account':
-        coinbaseApiService.getAccountId(function(error, data) {
-
-          if (error) {
-            message.response = {
-              statusCode: 500,
-              statusText: 'UNEXPECTED_ERROR',
-              data: {
-                message: error.message
-              }
-            };
-            return callback(message);
-          }
-
-          message.response = {
-            statusCode: 200,
-            statusText: 'OK',
-            data: data
-          };
-          return callback(message);
-
-        });
-        break;
 
       /**
-       * Remove all access tokens.
+       *  Remove all access tokens.
        */
       case 'logout':
 
-        coinbaseApiService.logout();
+        coinbaseService.logout().then(function() {
+
+          message.response = {
+            statusCode: 200,
+            statusText: 'OK',
+            data: {}
+          };
+          return callback(message);
+
+        }).catch(function(error) {
+
+          message.response = {
+            statusCode: 500,
+            statusText: 'UNEXPECTED_ERROR',
+            data: {
+              message: error.message
+            }
+          };
+          return callback(message);
+
+        });
+
+        break;
+
+      /**
+       *  Invalid request.
+       */
+      default:
 
         message.response = {
-          statusCode: 200,
-          statusText: 'OK',
-          data: {}
+          statusCode: 500,
+          statusText: 'REQUEST_NOT_VALID',
+          data: {
+            message: 'Unrecognized state.'
+          }
         };
         return callback(message);
+
         break;
     }
+
 	};
 
   return root;

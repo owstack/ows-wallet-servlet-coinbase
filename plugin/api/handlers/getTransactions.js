@@ -1,6 +1,6 @@
 'use strict';
 
-angular.module('owsWalletPlugin.api').service('getTransactions', function(coinbaseApiService) {
+angular.module('owsWalletPlugin.api').service('getTransactions', function(coinbaseService) {
 
 	var root = {};
 
@@ -22,7 +22,7 @@ angular.module('owsWalletPlugin.api').service('getTransactions', function(coinba
 
     if (!transactionId) {
       // Get a collection of transactions.
-      coinbaseApiService.getTransactions(accountId).then(function(response) {
+      coinbaseService.getTransactions(accountId).then(function(response) {
 
         message.response = {
           statusCode: 200,
@@ -46,7 +46,7 @@ angular.module('owsWalletPlugin.api').service('getTransactions', function(coinba
 
     } else {
       // Get a single transaction.
-      coinbaseApiService.getTransaction(accountId, transactionId).then(function(response) {
+      coinbaseService.getTransaction(accountId, transactionId).then(function(response) {
 
         message.response = {
           statusCode: 200,
