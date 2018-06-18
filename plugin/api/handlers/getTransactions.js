@@ -14,7 +14,7 @@ angular.module('owsWalletPlugin.api').service('getTransactions', function(coinba
         statusCode: 500,
         statusText: 'REQUEST_NOT_VALID',
         data: {
-          message: 'Missing required account id or pending.'
+          message: 'Missing required data, must provide accountId.'
         }
       };
       return callback(message);

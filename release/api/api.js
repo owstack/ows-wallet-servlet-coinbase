@@ -1,10 +1,11 @@
 'use strict';
 
-angular.module('owsWalletPlugin.api').factory('Account', function ($log, lodash, ApiMessage, CoinbaseServlet, PluginAPIHelper, System) {
+angular.module('owsWalletPlugin.api').factory('Account', function ($log, ApiMessage, CoinbaseServlet, PluginAPIHelper, System) {
 
   /**
    * Constructor.
    * @param {string} accountData - The Coinbase account data from Coinbase.
+   * @param {string} coinbase -The Coinbase object.
    * @constructor
    *
    * Sample Coinbase account data response.
@@ -31,12 +32,17 @@ angular.module('owsWalletPlugin.api').factory('Account', function ($log, lodash,
    *   resource_path: '/v2/accounts/17b8256d-263d-5915-be51-4563fa641b0d'
    * }
    */
-  var publicProperties = ['id', 'name', 'currency.code', 'currency.name', 'currency.color', 'balance'];
+  var publicProperties = ['id', 'name', 'currency.code', 'currency.name', 'currency.color', 'balance', 'sort'];
 
-  function Account(accountData) {
+  function Account(accountData, coinbaseObj) {
     var self = this;
     var accountData = accountData;
     System.assign(this, accountData, publicProperties);
+
+    var coinbase = coinbaseObj;
+
+    // Convert numeric values to numbers.
+    this.balance.amount = parseFloat(this.balance.amount);
 
     CoinbaseServlet = new PluginAPIHelper(CoinbaseServlet);
     var apiRoot = CoinbaseServlet.apiRoot();
@@ -44,6 +50,22 @@ angular.module('owsWalletPlugin.api').factory('Account', function ($log, lodash,
     /**
      * Public functions
      */
+
+    this.getBalance = function(currency) {
+      return coinbase.exchangeRates(this.balance.currency).then(function(rates) {
+        if (!rates[currency]) {
+          throw new Error('Could not get account balance, invalid currency: ' + currency);
+        }
+
+        self.balance.altCurrency = currency;
+        self.balance.altAmount = self.balance.amount * parseFloat(rates[currency]);
+        return self.balance.altAmount;
+
+      }).catch(function(error) {
+        throw new Error(error.message || error);
+
+      });
+    };
 
     this.createAddress = function(data) {
       var request = {
@@ -57,7 +79,7 @@ angular.module('owsWalletPlugin.api').factory('Account', function ($log, lodash,
         return response;
 
       }).catch(function(error) {
-        $log.error('Coinbase.createAddress():' + error.message + ', detail:' + error.detail);
+        $log.error('Coinbase.createAddress():' + error.message + ', ' + error.detail);
         throw new Error(error.message);
         
       });
@@ -75,7 +97,7 @@ angular.module('owsWalletPlugin.api').factory('Account', function ($log, lodash,
         return response;
 
       }).catch(function(error) {
-        $log.error('Coinbase.buyRequest():' + error.message + ', detail:' + error.detail);
+        $log.error('Coinbase.buyRequest():' + error.message + ', ' + error.detail);
         throw new Error(error.message);
         
       });
@@ -92,7 +114,7 @@ angular.module('owsWalletPlugin.api').factory('Account', function ($log, lodash,
         return response;
 
       }).catch(function(error) {
-        $log.error('Coinbase.getBuyOrder():' + error.message + ', detail:' + error.detail);
+        $log.error('Coinbase.getBuyOrder():' + error.message + ', ' + error.detail);
         throw new Error(error.message);
         
       });
@@ -110,7 +132,7 @@ angular.module('owsWalletPlugin.api').factory('Account', function ($log, lodash,
         return response;
 
       }).catch(function(error) {
-        $log.error('Coinbase.sellRequest():' + error.message + ', detail:' + error.detail);
+        $log.error('Coinbase.sellRequest():' + error.message + ', ' + error.detail);
         throw new Error(error.message);
         
       });
@@ -127,7 +149,7 @@ angular.module('owsWalletPlugin.api').factory('Account', function ($log, lodash,
         return response;
 
       }).catch(function(error) {
-        $log.error('Coinbase.getTransaction():' + error.message + ', detail:' + error.detail);
+        $log.error('Coinbase.getTransaction():' + error.message + ', ' + error.detail);
         throw new Error(error.message);
         
       });
@@ -145,7 +167,7 @@ angular.module('owsWalletPlugin.api').factory('Account', function ($log, lodash,
         return response;
 
       }).catch(function(error) {
-        $log.error('Coinbase.getTransactions():' + error.message + ', detail:' + error.detail);
+        $log.error('Coinbase.getTransactions():' + error.message + ', ' + error.detail);
         throw new Error(error.message);
         
       });
@@ -159,7 +181,7 @@ angular.module('owsWalletPlugin.api').factory('Account', function ($log, lodash,
 
 'use strict';
 
-angular.module('owsWalletPlugin.api').factory('Coinbase', function ($log, Account, ApiMessage, CoinbaseServlet, PluginAPIHelper) {
+angular.module('owsWalletPlugin.api').factory('Coinbase', function ($log, lodash, Account, ApiMessage, CoinbaseServlet, PluginAPIHelper) {
 
   /**
    * Constructor.
@@ -177,9 +199,11 @@ angular.module('owsWalletPlugin.api').factory('Coinbase', function ($log, Accoun
     var apiRoot = CoinbaseServlet.apiRoot();
     var config = CoinbaseServlet.getConfig(configId);
 
-    this.account;
-    this.availableCurrencies;
+    this.accounts;
     this.urls;
+
+    // Used to sort items by currency.
+    this.currencySortOrder = ['USD', 'BTC', 'BCH', 'ETH', 'LTC'];
 
     var onCoinbaseConnect = onConnect;
     if (typeof onCoinbaseConnect != 'function') {
@@ -199,18 +223,6 @@ angular.module('owsWalletPlugin.api').factory('Coinbase', function ($log, Accoun
     owswallet.Plugin.onEvent('coinbase.oauth', function(event) {
       if (event.data.status == 'ERROR') {
         $log.error('Could not connect to Coinbase: ' + event.data.message);
-        onCoinbaseConnect(event.data.message);
-      } else {
-        onCoinbaseConnect();
-      }
-    });
-
-    // coinbase.account - Result of an attempt to obtain an account ID following a successful oauth pairing.
-    //
-    // Applies only to on mobile URI redirect from Coinbase. Event is handled by host app and sent here.
-    owswallet.Plugin.onEvent('coinbase.account', function(event) {
-      if (event.data.status == 'ERROR') {
-        $log.error('Could not get Coinbase account: ' + event.data.message);
         onCoinbaseConnect(event.data.message);
       } else {
         onCoinbaseConnect();
@@ -240,9 +252,31 @@ angular.module('owsWalletPlugin.api').factory('Coinbase', function ($log, Accoun
         return response;
 
       }).catch(function(error) {
-        $log.error('Coinbase.logout():' + error.message + ', detail:' + error.detail);
+        $log.error('Coinbase.logout():' + error.message + ', ' + error.detail);
         throw new Error(error.message);
         
+      });
+    };
+
+    this.getAccountByCurrencyCode = function(currencyCode) {
+      return lodash.find(this.accounts, function(a) {
+        return a.currency.code == currencyCode;
+      });
+    };
+
+    this.getAccountById = function(id) {
+      return lodash.find(this.accounts, function(a) {
+        return a.id == id;
+      });
+    };
+
+    this.updateAccountBalances = function(currency) {
+      lodash.forEach(this.accounts, function(account) {
+        account.getBalance(currency).then(function(balance) {
+          // Nothing to do; account objects updated
+        }).catch(function(error) {
+          $log.error(error);
+        });
       });
     };
 
@@ -257,7 +291,7 @@ angular.module('owsWalletPlugin.api').factory('Coinbase', function ($log, Accoun
         return response;
 
       }).catch(function(error) {
-        $log.error('Coinbase.getUser():' + error.message + ', detail:' + error.detail);
+        $log.error('Coinbase.getCurrentUser():' + error.message + ', ' + error.detail);
         throw new Error(error.message);
         
       });
@@ -274,7 +308,7 @@ angular.module('owsWalletPlugin.api').factory('Coinbase', function ($log, Accoun
         return response;
 
       }).catch(function(error) {
-        $log.error('Coinbase.getPaymentMethods():' + error.message + ', detail:' + error.detail);
+        $log.error('Coinbase.getPaymentMethods():' + error.message + ', ' + error.detail);
         throw new Error(error.message);
         
       });
@@ -317,7 +351,7 @@ angular.module('owsWalletPlugin.api').factory('Coinbase', function ($log, Accoun
         return response;
 
       }).catch(function(error) {
-        $log.error('Coinbase.buyPrice():' + error.message + ', detail:' + error.detail);
+        $log.error('Coinbase.buyPrice():' + error.message + ', ' + error.detail);
         throw new Error(error.message);
         
       });
@@ -334,7 +368,7 @@ angular.module('owsWalletPlugin.api').factory('Coinbase', function ($log, Accoun
         return response;
 
       }).catch(function(error) {
-        $log.error('Coinbase.sellPrice():' + error.message + ', detail:' + error.detail);
+        $log.error('Coinbase.sellPrice():' + error.message + ', ' + error.detail);
         throw new Error(error.message);
         
       });
@@ -351,7 +385,7 @@ angular.module('owsWalletPlugin.api').factory('Coinbase', function ($log, Accoun
         return response;
 
       }).catch(function(error) {
-        $log.error('Coinbase.spotPrice():' + error.message + ', detail:' + error.detail);
+        $log.error('Coinbase.spotPrice():' + error.message + ', ' + error.detail);
         throw new Error(error.message);
         
       });
@@ -368,7 +402,24 @@ angular.module('owsWalletPlugin.api').factory('Coinbase', function ($log, Accoun
         return response;
 
       }).catch(function(error) {
-        $log.error('Coinbase.historicPrice():' + error.message + ', detail:' + error.detail);
+        $log.error('Coinbase.historicPrice():' + error.message + ', ' + error.detail);
+        throw new Error(error.message);
+        
+      });
+    };
+
+    this.exchangeRates = function(currency) {
+      var request = {
+        method: 'GET',
+        url: apiRoot + '/exchange-rates/' + (currency || 'USD'),
+        responseObj: {}
+      };
+
+      return new ApiMessage(request).send().then(function(response) {
+        return response;
+
+      }).catch(function(error) {
+        $log.error('Coinbase.exchangeRates():' + error.message + ', ' + error.detail);
         throw new Error(error.message);
         
       });
@@ -385,7 +436,7 @@ angular.module('owsWalletPlugin.api').factory('Coinbase', function ($log, Accoun
         return response;
 
       }).catch(function(error) {
-        $log.error('Coinbase.getPendingTransactions():' + error.message + ', detail:' + error.detail);
+        $log.error('Coinbase.getPendingTransactions():' + error.message + ', ' + error.detail);
         throw new Error(error.message);
         
       });
@@ -406,7 +457,7 @@ angular.module('owsWalletPlugin.api').factory('Coinbase', function ($log, Accoun
         return response;
 
       }).catch(function(error) {
-        $log.error('Coinbase.savePendingTransaction():' + error.message + ', detail:' + error.detail);
+        $log.error('Coinbase.savePendingTransaction():' + error.message + ', ' + error.detail);
         throw new Error(error.message);
         
       });
@@ -429,12 +480,23 @@ angular.module('owsWalletPlugin.api').factory('Coinbase', function ($log, Accoun
       };
 
       return new ApiMessage(request).send().then(function(response) {
-        self.availableCurrencies = response.info.availableCurrencies;
         self.urls = response.info.urls;
 
-        // If there is no account id then we are not paired with our Coinbase account; don't create an account instance.
-        if (response.accountData && response.accountData.id) {
-          self.account = new Account(response.accountData);
+        // If there is no account then we are not paired with our Coinbase account; don't create an account instance.
+        if (response.accounts) {
+          self.accounts = [];
+          lodash.forEach(response.accounts, function(account) {
+            // Set a sort order.
+            account.sort = self.currencySortOrder.indexOf(account.currency.code);
+            account.sort = (account.sort < 0 ? 99 : account.sort); // Move items not found to end of sort.
+
+            self.accounts.push(new Account(account, self));
+          });
+
+          // Perform a sort.
+          self.accounts = lodash.sortBy(self.accounts, function(a) {
+            return a.sort;
+          });
         }
 
         onCoinbaseConnect();

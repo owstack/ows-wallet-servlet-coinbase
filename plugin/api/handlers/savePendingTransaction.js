@@ -14,7 +14,7 @@ angular.module('owsWalletPlugin.api').service('savePendingTransaction', function
         statusCode: 500,
         statusText: 'REQUEST_NOT_VALID',
         data: {
-          message: 'Missing required transaction.'
+          message: 'Missing required data, must provide tx.'
         }
       };
       return callback(message);

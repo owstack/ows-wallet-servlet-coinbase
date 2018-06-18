@@ -14,7 +14,7 @@ angular.module('owsWalletPlugin.api').service('getHistoricPrice', function(coinb
         statusCode: 500,
         statusText: 'REQUEST_NOT_VALID',
         data: {
-          message: 'Missing required currency pair.'
+          message: 'Missing required data, must provide currencyPair.'
         }
       };
       return callback(message);

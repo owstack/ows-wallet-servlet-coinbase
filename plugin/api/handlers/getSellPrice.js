@@ -13,7 +13,7 @@ angular.module('owsWalletPlugin.api').service('getSellPrice', function(coinbaseS
         statusCode: 500,
         statusText: 'REQUEST_NOT_VALID',
         data: {
-          message: 'Missing required currency.'
+          message: 'Missing required data, must provide currency.'
         }
       };
       return callback(message);

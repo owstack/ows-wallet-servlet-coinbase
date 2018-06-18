@@ -1,12 +1,14 @@
 'use strict';
 
-angular.module('owsWalletPlugin.api').service('getAvailableCurrencies', function(coinbaseService) {
+angular.module('owsWalletPlugin.api').service('getExchangeRates', function(coinbaseService) {
 
 	var root = {};
 
   root.respond = function(message, callback) {
+    // Request parameters.
+    var currency = message.request.params.currency;
 
-    coinbaseService.getAvailableCurrencies().then(function(response) {
+    coinbaseService.getExchangeRates(currency).then(function(response) {
 
       message.response = {
         statusCode: 200,
@@ -18,7 +20,7 @@ angular.module('owsWalletPlugin.api').service('getAvailableCurrencies', function
     }).catch(function(error) {
 
       message.response = {
-        statusCode: 500,
+        statusCode: 404,
         statusText: 'UNEXPECTED_ERROR',
         data: {
           message: error.message
@@ -27,6 +29,7 @@ angular.module('owsWalletPlugin.api').service('getAvailableCurrencies', function
       return callback(message);
 
     });
+
 	};
 
   return root;

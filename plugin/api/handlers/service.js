@@ -5,17 +5,19 @@ angular.module('owsWalletPlugin.api').service('service', function(coinbaseServic
 	var root = {};
 
   root.respond = function(message, callback) {
+    var clientId = message.header.clientId;
+
     // Request parameters.
     var state = message.request.data.state;
     var oauthCode = message.request.data.oauthCode;
     var pluginConfig = message.request.data.config;
 
-    if (!state) {
+    if (!state || !clientId) {
       message.response = {
         statusCode: 500,
         statusText: 'REQUEST_NOT_VALID',
         data: {
-          message: 'Missing required state.'
+          message: 'Missing required data, must provide state.'
         }
       };
       return callback(message);
@@ -42,7 +44,7 @@ angular.module('owsWalletPlugin.api').service('service', function(coinbaseServic
         // Initialize service configuration and attempt to get an account ID. If an oauthCode is specified
         // then it will be used to get the API token followed by the account ID. If an account ID cannot be 
         // obtained then no error will result and the accountId is undefined.
-        coinbaseService.init(pluginConfig, oauthCode).then(function(data) {
+        coinbaseService.init(clientId, pluginConfig, oauthCode).then(function(data) {
 
           message.response = {
             statusCode: 200,
@@ -71,7 +73,7 @@ angular.module('owsWalletPlugin.api').service('service', function(coinbaseServic
        */
       case 'logout':
 
-        coinbaseService.logout().then(function() {
+        coinbaseService.logout(clientId).then(function() {
 
           message.response = {
             statusCode: 200,

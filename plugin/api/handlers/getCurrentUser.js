@@ -11,7 +11,7 @@ angular.module('owsWalletPlugin.api').service('getCurrentUser', function(coinbas
       message.response = {
         statusCode: 200,
         statusText: 'OK',
-        data: account
+        data: response
       };
       return callback(message);
 

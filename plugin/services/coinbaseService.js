@@ -64,13 +64,13 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
   owswallet.Plugin.onEvent('host.new-block', function(event) {
     var network = lodash.get(event, 'event.n.data.network');
 
-    if (event.type == 'NewBlock' && network == 'livenet') {
+    if (event.type == 'NewBlock' && network.indexOf('livenet') >= 0)  {
       fetchPendingTransactions();
     }
   });
 
   // Invoked via the servlet API to initialize our environment using the provided configuration (typically from applet plugin configuration).
-  root.init = function(config, oauthCode) {
+  root.init = function(clientId, config, oauthCode) {
     return new Promise(function(resolve, reject) {
 
       // Use plugin configuration to setup for communicating with Coinbase.
@@ -78,43 +78,40 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
         setCredentials(config);
       }
 
-      // Setup access to our storage space.
+      // Setup access to our storage space; use clientId to create a unique name space.
       storage = new Storage([
         'access-token',
-        'account-id',
         'refresh-token',
         'txs'
-      ], root.getNetwork());
+      ], clientId);
 
       Settings.get().then(function(settings) {
         // Gather some additional information for the client. This information only during this initialization sequence.
         var info = {};
-        info.availableCurrencies = getAvailableCurrencies(settings);
         info.urls = getUrls();
 
         if (oauthCode) {
           // Use the oauthCode to get an API token followed by getting the account ID.
           getToken(oauthCode).then(function() {
             // Got the API token (saved to storage).
-            return doGetAccount();
+            return getAccounts();
 
-          }).then(function(accountData) {
+          }).then(function(accounts) {
             return resolve({
-              accountData: accountData,
+              accounts: accounts,
               info: info
             });
 
           });
 
         } else {
-          doGetAccount().then(function(accountData) {
+          getAccounts().then(function(accounts) {
             return resolve({
-              accountData: accountData,
+              accounts: accounts,
               info: info
             });
 
           });
-
         }
 
       }).catch(function(error) {
@@ -125,13 +122,10 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
     });
   };
 
-  root.logout = function() {    
+  root.logout = function() {
     return new Promise(function(resolve, reject) {
       storage.removeAccessToken().then(function() {
         return storage.removeRefreshToken();
-
-      }).then(function() {
-        return storage.removeAccountId();
 
       }).then(function() {
         return storage.removeTxs();
@@ -150,18 +144,26 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
     return storage;
   };
 
-  root.getNetwork = function() {
-    return credentials.NETWORK;
+  root.getExchangeRates = function(currency) {
+    return new Promise(function(resolve, reject) {
+      coinbaseApi.get('exchange-rates?currency=' + currency).then(function(response) {
+        var data = response.data.data.rates;
+        resolve(data);
+      }).catch(function(error) {
+        $log.error('Coinbase: getExchangeRates ' + error.status + '. ' + getErrorsAsString(error.data));
+        reject(error.data);
+      });
+    });
   };
 
-  root.getAccounts = function() {
+  function doGetAccounts() {
     return new Promise(function(resolve, reject) {
       coinbaseApi.get('accounts/').then(function(response) {
         // Response object returns with pagination; access the accounts array only.
         var data = response.data.data;
         resolve(data);
       }).catch(function(error) {
-        $log.error('Coinbase: getAccounts ' + error.status + '. ' + getErrorsAsString(error.data));
+        $log.error('Coinbase: doGetAccounts ' + error.status + '. ' + getErrorsAsString(error.data));
         reject(error.data);
       });
     });
@@ -586,13 +588,7 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
    */
 
   function setCredentials(config) {
-    /**
-     * Development: 'testnet'
-     * Production: 'livenet'
-     */
-    credentials.NETWORK = 'livenet/btc';
-
-    // Coinbase permissions
+    // Coinbase permissions.
     credentials.SCOPE = '' +
       'wallet:accounts:read,' +
       'wallet:addresses:read,' +
@@ -614,20 +610,13 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       credentials.REDIRECT_URI = config.redirect_uri.desktop;
     }
 
-    if (credentials.NETWORK.indexOf('testnet') >= 0) {
-      credentials.HOST = config.sandbox.host;
-      credentials.API = config.sandbox.api;
-      credentials.CLIENT_ID = config.sandbox.client_id;
-      credentials.CLIENT_SECRET = config.sandbox.client_secret;
-    } else {
-      credentials.HOST = config.production.host;
-      credentials.API = config.production.api;
-      credentials.CLIENT_ID = config.production.client_id;
-      credentials.CLIENT_SECRET = config.production.client_secret;
-    };
+    credentials.HOST = config.production.host;
+    credentials.API = config.production.api;
+    credentials.CLIENT_ID = config.production.client_id;
+    credentials.CLIENT_SECRET = config.production.client_secret;
 
-    // Force to use specific version
-    credentials.API_VERSION = '2017-10-31';
+    // Date of this implementation.
+    credentials.API_VERSION = '2018-01-06';
 
     // Using these credentials, create a host provider.
     createCoinbaseHostProvider();
@@ -696,7 +685,6 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
 
   function saveToken(accessToken, refreshToken, cb) {
     storage.setAccessToken(accessToken).then(function() {
-
       return storage.setRefreshToken(refreshToken);
 
     }).then(function() {
@@ -727,6 +715,7 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
           var data = response.data;
           if (data && data.access_token && data.refresh_token) {
             saveToken(data.access_token, data.refresh_token, function() {
+              $log.info('Successfully refreshed token from Coinbase');
               return resolve();
             });
           } else {
@@ -743,17 +732,10 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
   };
 
   function getUrls() {
-    // credentials.HOST         = https://www.coinbase.com
-    //                            /oauth/authorize?response_type=code&client_id=
-    // credentials.CLIENT_ID    = YOUR_CLIENT_ID
-    //                            &redirect_uri=
-    // credentials.REDIRECT_URI = YOUR_REDIRECT_URL  ('owswallet://coinbase')
-    //                            &state=SECURE_RANDOM&scope=
-    // credentials.SCOPE        = <hardcoded permissions>
     return {
       oauthCodeUrl: '' +
         credentials.HOST +
-        '/oauth/authorize?response_type=code&client_id=' +
+        '/oauth/authorize?response_type=code&account=all&client_id=' +
         credentials.CLIENT_ID +
         '&redirect_uri=' +
         credentials.REDIRECT_URI +
@@ -761,141 +743,81 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
         credentials.SCOPE +
 //TODO        '&meta[send_limit_amount]=1000&meta[send_limit_currency]=USD&meta[send_limit_period]=day',
         '&meta[send_limit_amount]=1&meta[send_limit_currency]=USD&meta[send_limit_period]=day',
-      signupUrl: credentials.HOST + '/signup',
-      supportUrl: 'https://support.coinbase.com/'
+      signupUrl: 'https://www.coinbase.com/signup',
+      supportUrl: 'https://support.coinbase.com',
+      privacyUrl: 'https://www.coinbase.com/legal/user_agreement'
     };
   };
 
-  function getAvailableCurrencies(settings) {
-    var currencies = [];
-
-    // Only "USD"
-    switch (settings.networks[root.getNetwork()].alternativeIsoCode) {
-      default: currencies.push('USD');
-    };
-    return currencies;
-  };
-
-  function doGetAccount() {
+  function getAccounts() {
     return new Promise(function(resolve, reject) {
-      // Retrieve the account ID then account data from a prior Coinbase pairing event.
-      getAccountId(function(err, accountId) {
-        if (err) {
-          return reject(err);
-        }
+      $log.debug('Accessing Coinbase account...');
 
-        // If no account ID then return now.
-        if (!accountId) {
+      getTokenFromStorage().then(function(accessToken) {
+        if (!accessToken) {
+          $log.warn('No access token while trying to access account');
           return resolve();
+
+        } else {
+          doGetAccounts().then(function(accounts) {
+            return resolve(accounts);
+
+          }).catch(function(error) {
+
+            // Check for a Coinbase error reponse. If not then return otherwise continue.
+            if (!error.errors || (error.errors && !lodash.isArray(error.errors))) {
+              return reject('Could not get account id: ' + error);
+            }
+
+            // There is a Coinbase error, check to see if the access token is expired.
+            var expiredToken;
+            var revokedToken;
+            var invalidToken;
+            for (var i = 0; i < error.errors.length; i++) {
+              expiredToken = (error.errors[i].id == 'expired_token');
+              revokedToken = (error.errors[i].id == 'revoked_token');
+              invalidToken = (error.errors[i].id == 'invalid_token');
+            }
+
+            // Refresh an expired access token and retrieve the account ID.
+            // The results are stored and the account ID is returned, otherwise an error is returned.
+            if (expiredToken) {
+              $log.debug('Refreshing access token');
+
+              refreshToken().then(function() {
+                return doGetAccounts();
+
+              }).then(function(accounts) {
+                return resolve(accounts);
+
+              }).catch(function(error) {
+                return reject('Could not refresh access token: ' + error);
+
+              });
+
+            } else if (revokedToken) {
+              $log.debug('Token revoked, logging out');
+              root.logout();
+              return resolve(); // No access token
+
+            } else if (invalidToken) {
+              $log.debug('Token invalid, logging out');
+              root.logout();
+              return resolve(); // No access token
+
+            } else {
+              return reject('Unexpected error getting account id: ' + getErrorsAsString(error));
+            }
+          });
         }
-
-        // Got account id, now load the account information.
-        root.getAccount(accountId).then(function(accountData) {
-          return resolve(accountData);
-        });
-      });
-
-    });
-  };
-  
-  var getAccountId = lodash.throttle(function(cb) {
-    $log.debug('Accessing Coinbase account...');
-
-    getTokenFromStorage().then(function(accessToken) {
-      if (!accessToken) {
-        $log.warn('No access token while trying to access account');
-        return cb();
-
-      } else {
-        getMainAccountId().then(function(accountId) {
-
-          return storage.setAccountId(accountId);
-
-        }).then(function(accountId) {
-
-          return cb(null, accountId);
-
-        }).catch(function(error) {
-
-          // Check for a Coinbase error reponse. If not then return otherwise continue.
-          if (!error.errors || (error.errors && !lodash.isArray(error.errors))) {
-            return cb('Could not get account id: ' + error);
-          }
-
-          // There is a Coinbase error, check to see if the access token is expired.
-          var expiredToken;
-          var revokedToken;
-          var invalidToken;
-          for (var i = 0; i < error.errors.length; i++) {
-            expiredToken = (error.errors[i].id == 'expired_token');
-            revokedToken = (error.errors[i].id == 'revoked_token');
-            invalidToken = (error.errors[i].id == 'invalid_token');
-          }
-
-          // Refresh an expired access token and retrieve the account ID.
-          // The results are stored and the account ID is returned, otherwise an error is returned.
-          if (expiredToken) {
-            $log.debug('Refreshing access token');
-
-            refreshToken().then(function() {
-
-              return getMainAccountId();
-
-            }).then(function(accountId) {
-
-              return storage.setAccountId(accountId);
-
-            }).then(function(accountId) {
-
-              return cb(null, accountId);
-
-            }).catch(function(error) {
-              return cb('Could not refresh access token: ' + error);
-
-            });
-
-          } else if (revokedToken) {
-            $log.debug('Token revoked, logging out');
-            root.logout();
-            return cb(); // No access token
-
-          } else if (invalidToken) {
-            $log.debug('Token invalid, logging out');
-            root.logout();
-            return cb(); // No access token
-
-          } else {
-            return cb('Unexpected error getting account id: ' + getErrorsAsString(error));
-          }
-        });
-      }
-
-    }).catch(function(error) {
-      return cb('Unexpected error getting account id: ' + getErrorsAsString(error));
-
-    });
-  }, 10000);
-  
-  function getMainAccountId() {
-    return new Promise(function(resolve, reject) {
-      root.getAccounts().then(function(accounts) {
-
-        for (var i = 0; i < accounts.length; i++) {
-          if (accounts[i].primary && accounts[i].type == 'wallet' && accounts[i].currency && accounts[i].currency.code == 'BTC') {
-            return resolve(accounts[i].id);
-          }
-        }
-
-        root.logout();
-        reject('Your primary account should be a BTC wallet. Set your BTC wallet account as primary and try again.');
 
       }).catch(function(error) {
-        return reject(error);
+        return reject('Unexpected error getting account id: ' + getErrorsAsString(error));
 
       });
     });
   };
-
+  
   function updatePendingTransactions(obj /*, …*/ ) {
     for (var i = 1; i < arguments.length; i++) {
       for (var prop in arguments[i]) {
