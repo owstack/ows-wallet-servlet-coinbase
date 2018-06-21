@@ -54,7 +54,7 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       return;
     }
 
-    var oauthCode = System.getUrlParameterByName(event.data, 'code');
+    var oauthCode = Utils.getUrlParameterByName(event.data, 'code');
     if (oauthCode && oauthCode.length > 0) {
       root.init(null, oauthCode);
     }
@@ -357,14 +357,14 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
     });
   };
 */
-  root.sellRequest = function(accountId, data) {
+  root.sellRequest = function(accountId, requestData) {
     return new Promise(function(resolve, reject) {
       var data = {
-        amount: data.amount,
-        currency: data.currency,
-        payment_method: data.payment_method ||  null,
-        commit: data.commit || false,
-        quote: data.quote || false
+        amount: requestData.amount,
+        currency: requestData.currency,
+        payment_method: requestData.payment_method ||  null,
+        commit: requestData.commit || false,
+        quote: requestData.quote || false
       };
 
       coinbaseApi.post('accounts/' + accountId + '/sells', data).then(function(response) {
@@ -389,14 +389,14 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
     });
   };
 */
-  root.buyRequest = function(accountId, data) {
+  root.buyRequest = function(accountId, requestData) {
     return new Promise(function(resolve, reject) {
       var data = {
-        amount: data.amount,
-        currency: data.currency,
-        payment_method: data.payment_method || null,
-        commit: data.commit || false,
-        quote: data.quote || false
+        amount: requestData.amount,
+        currency: requestData.currency,
+        payment_method: requestData.payment_method || null,
+        commit: requestData.commit || false,
+        quote: requestData.quote || false
       };
 
       coinbaseApi.post('accounts/' + accountId + '/buys', data).then(function(response) {
@@ -421,10 +421,10 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
     });
   };
 */
-  root.createAddress = function(accountId, data) {
+  root.createAddress = function(accountId, addressData) {
     return new Promise(function(resolve, reject) {
       var data = {
-        name: data.name
+        name: addressData.name
       };
 
       coinbaseApi.post('accounts/' + accountId + '/addresses', data).then(function(response) {
@@ -437,14 +437,14 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
     });
   };
 
-  root.sendTo = function(accountId, data) {
+  root.sendTo = function(accountId, sendData) {
     return new Promise(function(resolve, reject) {
       var data = {
         type: 'send',
-        to: data.to,
-        amount: data.amount,
-        currency: data.currency,
-        description: data.description
+        to: sendData.to,
+        amount: sendData.amount,
+        currency: sendData.currency,
+        description: sendData.description
       };
 
       coinbaseApi.post('accounts/' + accountId + '/transactions', data).then(function(response) {
@@ -452,6 +452,18 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
         resolve(data);
       }).catch(function(error) {
         $log.error('Coinbase: sendTo ' + error.status + '. ' + getErrorsAsString(error.data));
+        reject(error.data);
+      });
+    });
+  };
+
+  root.getAccountTransactions = function(accountId) {
+    return new Promise(function(resolve, reject) {
+      coinbaseApi.get('accounts/' + accountId + '/transactions').then(function(response) {
+        var data = response.data.data;
+        resolve(data);
+      }).catch(function(error) {
+        $log.error('Coinbase: getAccountTransactions ' + error.status + '. ' + getErrorsAsString(error.data));
         reject(error.data);
       });
     });

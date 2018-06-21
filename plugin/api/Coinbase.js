@@ -14,15 +14,31 @@ angular.module('owsWalletPlugin.api').factory('Coinbase', function ($log, lodash
   function Coinbase(configId, onConnect) {
     var self = this;
 
-    CoinbaseServlet = new PluginAPIHelper(CoinbaseServlet);
-    var apiRoot = CoinbaseServlet.apiRoot();
-    var config = CoinbaseServlet.getConfig(configId);
+    var servlet = new PluginAPIHelper(CoinbaseServlet);
+    var apiRoot = servlet.apiRoot();
+    var config = servlet.getConfig(configId);
 
     this.accounts;
     this.urls;
 
-    // Used to sort items by currency.
-    this.currencySortOrder = ['USD', 'BTC', 'BCH', 'ETH', 'LTC'];
+    // The collection of crypto-currencies offered by Coinbase.
+    // Array is in display 'sort' order.
+    this.cryptoCurrencies = [{
+      code: 'BTC'
+    }, {
+      code: 'BCH'
+    }, {
+      code: 'ETH'
+    }, {
+      code: 'LTC'
+    }];
+
+    this.altCurrencies = [{
+      code: 'USD'
+    }];
+
+    this.allCurrencies = this.altCurrencies.concat(this.cryptoCurrencies);
+    this.currencySortOrder = this.allCurrencies;
 
     var onCoinbaseConnect = onConnect;
     if (typeof onCoinbaseConnect != 'function') {
@@ -77,6 +93,13 @@ angular.module('owsWalletPlugin.api').factory('Coinbase', function ($log, lodash
       });
     };
 
+    this.isCryptoCurrency = function(currencyCode) {
+      var c = lodash.find(this.cryptoCurrencies, function(c) {
+        return c.code == currencyCode;
+      });
+      return (c != undefined);
+    };
+
     this.getAccountByCurrencyCode = function(currencyCode) {
       return lodash.find(this.accounts, function(a) {
         return a.currency.code == currencyCode;
@@ -90,11 +113,21 @@ angular.module('owsWalletPlugin.api').factory('Coinbase', function ($log, lodash
     };
 
     this.updateAccountBalances = function(currency) {
-      lodash.forEach(this.accounts, function(account) {
-        account.getBalance(currency).then(function(balance) {
-          // Nothing to do; account objects updated
-        }).catch(function(error) {
-          $log.error(error);
+      return new Promise(function(resolve, reject) {
+        var count = self.accounts.length;
+        lodash.forEach(self.accounts, function(account) {
+          account.getBalance(currency).then(function(balance) {
+            count--;
+            if (!count) {
+              resolve();
+            }
+          }).catch(function(error) {
+            $log.error(error);
+            count--;
+            if (!count) {
+              resolve(); // Just log error and resolve
+            }
+          });
         });
       });
     };
@@ -305,10 +338,6 @@ angular.module('owsWalletPlugin.api').factory('Coinbase', function ($log, lodash
         if (response.accounts) {
           self.accounts = [];
           lodash.forEach(response.accounts, function(account) {
-            // Set a sort order.
-            account.sort = self.currencySortOrder.indexOf(account.currency.code);
-            account.sort = (account.sort < 0 ? 99 : account.sort); // Move items not found to end of sort.
-
             self.accounts.push(new Account(account, self));
           });
 

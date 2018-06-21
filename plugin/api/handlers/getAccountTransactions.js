@@ -1,13 +1,12 @@
 'use strict';
 
-angular.module('owsWalletPlugin.api').service('requestBuy', function(coinbaseService) {
+angular.module('owsWalletPlugin.api').service('getAccountTransactions', function(coinbaseService) {
 
 	var root = {};
 
   root.respond = function(message, callback) {
     // Request parameters.
     var accountId = message.request.params.accountId;
-    var data = message.request.data.data;
 
     if (!accountId) {
       message.response = {
@@ -20,12 +19,12 @@ angular.module('owsWalletPlugin.api').service('requestBuy', function(coinbaseSer
       return callback(message);
     };
 
-    coinbaseService.requestBuy(accountId, data).then(function(response) {
+    coinbaseService.getAccountTransactions(accountId).then(function(transactions) {
 
       message.response = {
         statusCode: 200,
         statusText: 'OK',
-        data: response
+        data: transactions
       };
       return callback(message);
 

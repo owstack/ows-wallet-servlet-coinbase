@@ -7,7 +7,7 @@ angular.module('owsWalletPlugin.api').service('createAddress', function(coinbase
   root.respond = function(message, callback) {
     // Request parameters.
     var accountId = message.request.params.accountId;
-    var data = message.request.data.data;
+    var data = message.request.data;
 
     if (!accountId) {
       message.response = {
@@ -25,7 +25,7 @@ angular.module('owsWalletPlugin.api').service('createAddress', function(coinbase
       message.response = {
         statusCode: 200,
         statusText: 'OK',
-        data: account
+        data: response
       };
       return callback(message);
 

@@ -11,6 +11,7 @@ angular.module('owsWalletPlugin').config(function($pluginConfigProvider) {
     { path: '/accounts/:accountId/addresses',         method: 'POST', handler: 'createAddress' },
     { path: '/accounts/:accountId/buys',              method: 'POST', handler: 'requestBuy' },
     { path: '/accounts/:accountId/sells',             method: 'POST', handler: 'requestSell' },
+    { path: '/accounts/:accountId/transactions',      method: 'GET',  handler: 'getAccountTransactions' },
     { path: '/exchange-rates/:currency?',             method: 'GET',  handler: 'getExchangeRates' },
     { path: '/payment-methods',                       method: 'GET',  handler: 'getPaymentMethods' },
     { path: '/prices',                                method: 'GET',  handler: 'getPriceInfo' },

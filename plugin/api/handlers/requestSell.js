@@ -25,7 +25,7 @@ angular.module('owsWalletPlugin.api').service('requestSell', function(coinbaseSe
       message.response = {
         statusCode: 200,
         statusText: 'OK',
-        data: account
+        data: response
       };
       return callback(message);
 
