@@ -1,6 +1,6 @@
 'use strict';
 
-angular.module('owsWalletPlugin.api').service('savePendingTransaction', function(coinbaseService) {
+angular.module('owsWalletPlugin.apiHandlers').service('savePendingTransaction', function(coinbaseService) {
 
 	var root = {};
 

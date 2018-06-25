@@ -1,6 +1,6 @@
 'use strict';
 
-angular.module('owsWalletPlugin.api').service('createAddress', function(coinbaseService) {
+angular.module('owsWalletPlugin.apiHandlers').service('createAddress', function(coinbaseService) {
 
 	var root = {};
 

@@ -1,6 +1,11 @@
 'use strict';
 
-angular.module('owsWalletPlugin.api').factory('Account', function ($log, lodash, ApiMessage, CoinbaseServlet, PluginAPIHelper, Address, Utils, Transaction) {
+angular.module('owsWalletPlugin.api.coinbase').factory('Account', function ($log, lodash, ApiMessage,
+  /* @namespace owsWalletPlugin.api.coinbase */ Address,
+  /* @namespace owsWalletPlugin.api.coinbase */ CoinbaseServlet,
+  /* @namespace owsWalletPluginClient.api */ PluginAPIHelper,
+  /* @namespace owsWalletPlugin.api.coinbase */ Transaction,
+  /* @namespace owsWalletPluginClient.api */ Utils) {
 
   /**
    * Constructor.
@@ -88,12 +93,11 @@ angular.module('owsWalletPlugin.api').factory('Account', function ($log, lodash,
         url: apiRoot + '/accounts/' + this.id + '/addresses',
         data: {
           name: name || 'New receive address'
-        },
-        responseObj: {}
+        }
       };
 
       return new ApiMessage(request).send().then(function(response) {
-        return new Address(response, self);
+        return new Address(response.data, self);
 
       }).catch(function(error) {
         $log.error('Account.createAddress():' + error.message + ', ' + error.detail);
@@ -106,12 +110,11 @@ angular.module('owsWalletPlugin.api').factory('Account', function ($log, lodash,
       var request = {
         method: 'POST',
         url: apiRoot + '/accounts/buys/' + this.id,
-        data: data,
-        responseObj: {}
+        data: data
       };
 
       return new ApiMessage(request).send().then(function(response) {
-        return response;
+        return response.data;
 
       }).catch(function(error) {
         $log.error('Account.buyRequest():' + error.message + ', ' + error.detail);
@@ -123,12 +126,11 @@ angular.module('owsWalletPlugin.api').factory('Account', function ($log, lodash,
     this.getBuyOrder = function(buyId) {
       var request = {
         method: 'GET',
-        url: apiRoot + '/accounts/' + this.id + '/buys/' + buyId,
-        responseObj: {}
+        url: apiRoot + '/accounts/' + this.id + '/buys/' + buyId
       };
 
       return new ApiMessage(request).send().then(function(response) {
-        return response;
+        return response.data;
 
       }).catch(function(error) {
         $log.error('Account.getBuyOrder():' + error.message + ', ' + error.detail);
@@ -141,12 +143,11 @@ angular.module('owsWalletPlugin.api').factory('Account', function ($log, lodash,
       var request = {
         method: 'POST',
         url: apiRoot + '/accounts/' + this.id + '/sells',
-        data: data,
-        responseObj: {}
+        data: data
       };
 
       return new ApiMessage(request).send().then(function(response) {
-        return response;
+        return response.data;
 
       }).catch(function(error) {
         $log.error('Account.sellRequest():' + error.message + ', ' + error.detail);
@@ -158,12 +159,11 @@ angular.module('owsWalletPlugin.api').factory('Account', function ($log, lodash,
     this.getTransaction = function(txId) {
       var request = {
         method: 'GET',
-        url: apiRoot + '/accounts/' + this.id + '/transactions/' + txId,
-        responseObj: {}
+        url: apiRoot + '/accounts/' + this.id + '/transactions/' + txId
       };
 
       return new ApiMessage(request).send().then(function(response) {
-        return response;
+        return response.data;
 
       }).catch(function(error) {
         $log.error('Account.getTransaction():' + error.message + ', ' + error.detail);
@@ -176,12 +176,13 @@ angular.module('owsWalletPlugin.api').factory('Account', function ($log, lodash,
       var request = {
         method: 'GET',
         url: apiRoot + '/accounts/' + this.id + '/transactions',
-        data: {},
-        responseObj: {}
+        data: {}
       };
 
-      return new ApiMessage(request).send().then(function(transactions) {
+      return new ApiMessage(request).send().then(function(response) {
+        var transactions = response.data;
         self.transactions = [];
+
         lodash.forEach(transactions, function(txData) {
           self.transactions.push(new Transaction(txData, self));
         });

@@ -1,6 +1,9 @@
 'use strict';
 
-angular.module('owsWalletPlugin.api').factory('Transaction', function (CoinbaseServlet, PluginAPIHelper, Utils) {
+angular.module('owsWalletPlugin.api.coinbase').factory('Transaction', function (
+  /* @namespace owsWalletPlugin.api.coinbase */ CoinbaseServlet,
+  /* @namespace owsWalletPluginClient.api */ PluginAPIHelper,
+  /* @namespace owsWalletPluginClient.api */ Utils) {
 
   /**
    * Constructor.

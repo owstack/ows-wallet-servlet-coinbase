@@ -1,6 +1,6 @@
 'use strict';
 
-angular.module('owsWalletPlugin.api').service('getBuyPrice', function(coinbaseService) {
+angular.module('owsWalletPlugin.apiHandlers').service('getBuyPrice', function(coinbaseService) {
 
 	var root = {};
 

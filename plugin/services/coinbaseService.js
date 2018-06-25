@@ -1,6 +1,12 @@
 'use strict';
 
-angular.module('owsWalletPlugin.services').factory('coinbaseService', function($rootScope, $log, lodash, Http, Session, Storage, Settings, Host) {
+angular.module('owsWalletPlugin.services').factory('coinbaseService', function($rootScope, $log, lodash,
+  /* @namespace owsWalletPluginClient.api */ Host,
+  /* @namespace owsWalletPluginClient.api */ Http,
+  /* @namespace owsWalletPluginClient.api */ Session,
+  /* @namespace owsWalletPluginClient.api */ Settings,
+  /* @namespace owsWalletPluginClient.api */ Storage) {
+
   var root = {};
 
   var isCordova = owswallet.Plugin.isCordova();

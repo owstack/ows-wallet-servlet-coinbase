@@ -1,6 +1,6 @@
 'use strict';
 
-angular.module('owsWalletPlugin.api').service('getCurrentUser', function(coinbaseService) {
+angular.module('owsWalletPlugin.apiHandlers').service('getCurrentUser', function(coinbaseService) {
 
 	var root = {};
 
