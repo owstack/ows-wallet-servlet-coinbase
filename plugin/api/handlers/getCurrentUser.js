@@ -5,21 +5,31 @@ angular.module('owsWalletPlugin.apiHandlers').service('getCurrentUser', function
 	var root = {};
 
   root.respond = function(message, callback) {
+    var data = {
+      user: {},
+      auth: {}
+    };
 
     coinbaseService.getCurrentUser().then(function(response) {
+      data.user = response;
 
-      message.response = {
-        statusCode: 200,
-        statusText: 'OK',
-        data: response
-      };
-      return callback(message);
+      coinbaseService.getUserAuth().then(function(response) {
+        data.auth = response;
+
+        message.response = {
+          statusCode: 200,
+          statusText: 'OK',
+          data: data
+        };
+        return callback(message);
+
+      });
 
     }).catch(function(error) {
 
       message.response = {
-        statusCode: 500,
-        statusText: 'UNEXPECTED_ERROR',
+        statusCode: error.statusCode || 500,
+        statusText: error.statusText || 'UNEXPECTED_ERROR',
         data: {
           message: error.message
         }

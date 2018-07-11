@@ -3,18 +3,20 @@
 angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($log, lodash, ApiMessage,
   /* @namespace owsWalletPlugin.api.coinbase */ Account,
   /* @namespace owsWalletPlugin.api.coinbase */ CoinbaseServlet,
-  /* @namespace owsWalletPluginClient.api */ PluginAPIHelper) {
+  /* @namespace owsWalletPlugin.api.coinbase */ PaymentMethod,
+  /* @namespace owsWalletPluginClient.api */ PluginAPIHelper,
+  /* @namespace owsWalletPlugin.api.coinbase */ User) {
 
   /**
    * Constructor.
    * @param {Object} configId - The configuration ID for the servlet.
-   * @param {Function} onConnect - A callback function invoked when an oauth pairing event is received. Called with
+   * @param {Function} onLogin - A callback function invoked when an oauth pairing event is received. Called with
    * the following arguments (error, haveAccount). 'error' specifies that an error occurred during the pairing process.
    * 'haveAccount' is true if we are paired with an account, false if pairing is still required (has not been done yet).
    * If an error occurred then 'hasAccount' is undefined.
    * @constructor
    */
-  function Coinbase(configId, onConnect) {
+  function Coinbase(configId, onLogin) {
     var self = this;
 
     var servlet = new PluginAPIHelper(CoinbaseServlet);
@@ -22,34 +24,39 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
     var config = servlet.getConfig(configId);
 
     this.accounts;
+    this.paymentMethods;
     this.urls;
 
-    // The collection of crypto-currencies offered by Coinbase.
-    // Array is in display 'sort' order.
-    this.cryptoCurrencies = [{
-      code: 'BTC'
+    // The collection of currencies offered by Coinbase as 'products'.
+    this.currencies = [{
+      code: 'USD',
+      name: 'US Dollar',
+      sort: 0
     }, {
-      code: 'BCH'
+      code: 'BTC',
+      name: 'Bitcoin',
+      sort: 1
     }, {
-      code: 'ETH'
+      code: 'BCH',
+      name: 'Bitcoin Cash',
+      sort: 2
     }, {
-      code: 'LTC'
+      code: 'ETH',
+      name: 'Ethereum',
+      sort: 3
+    }, {
+      code: 'LTC',
+      name: 'Litecoin',
+      sort: 4
     }];
 
-    this.altCurrencies = [{
-      code: 'USD'
-    }];
-
-    this.allCurrencies = this.altCurrencies.concat(this.cryptoCurrencies);
-    this.currencySortOrder = this.allCurrencies;
-
-    var onCoinbaseConnect = onConnect;
-    if (typeof onCoinbaseConnect != 'function') {
-      throw new Error('You must provide an onConnect function to the constructor');
+    var onCoinbaseLogin = onLogin;
+    if (typeof onCoinbaseLogin != 'function') {
+      throw new Error('You must provide an onLogin function to the constructor');
     }
 
-    // Attempt to get a connection using a previously paired state (stored API token).
-    doConnect();
+    // Attempt to get an authenticated connection using a previously paired state (stored API token).
+    doLogin();
 
     /**
      * Events
@@ -60,10 +67,10 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
     // Applies only to on mobile URI redirect from Coinbase. Event is handled by host app and sent here.
     owswallet.Plugin.onEvent('coinbase.oauth', function(event) {
       if (event.data.status == 'ERROR') {
-        $log.error('Could not connect to Coinbase: ' + event.data.message);
-        onCoinbaseConnect(event.data.message);
+        $log.error('Could not authenticate with Coinbase: ' + event.data.message);
+        onCoinbaseLogin(event.data.message);
       } else {
-        onCoinbaseConnect();
+        onCoinbaseLogin();
       }
     });
 
@@ -71,9 +78,9 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
      * Public functions
      */
 
-    this.connect = function(oauthCode, onConnect) {
-      onCoinbaseConnect = onConnect || onCoinbaseConnect;
-      return doConnect(oauthCode);
+    this.login = function(oauthCode, onLogin) {
+      onCoinbaseLogin = onLogin || onCoinbaseLogin;
+      return doLogin(oauthCode);
     };
 
     this.logout = function() {
@@ -82,6 +89,9 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
         url: apiRoot + '/service',
         data: {
           state: 'logout'
+        },
+        opts: {
+          cancelOn: [401]
         }
       };
 
@@ -95,11 +105,10 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
       });
     };
 
-    this.isCryptoCurrency = function(currencyCode) {
-      var c = lodash.find(this.cryptoCurrencies, function(c) {
-        return c.code == currencyCode;
+    this.getCurrencyByCode = function(code) {
+      return lodash.find(this.currencies, function(c) {
+        return c.code == code;
       });
-      return (c != undefined);
     };
 
     this.getAccountByCurrencyCode = function(currencyCode) {
@@ -111,6 +120,12 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
     this.getAccountById = function(id) {
       return lodash.find(this.accounts, function(a) {
         return a.id == id;
+      });
+    };
+
+    this.getPaymentMethodById = function(id) {
+      return lodash.find(this.paymentMethods, function(m) {
+        return m.id == id;
       });
     };
 
@@ -134,14 +149,46 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
       });
     };
 
-    this.getCurrentUser = function() {
+    this.getAccounts = function() {
       var request = {
         method: 'GET',
-        url: apiRoot + '/user'
+        url: apiRoot + '/accounts'
       };
 
       return new ApiMessage(request).send().then(function(response) {
-        return response.data;
+
+        if (response.data) {
+          var accountObjs = response.data;
+          self.accounts = [];
+
+          lodash.forEach(accountObjs, function(account) {
+            self.accounts.push(new Account(account, self));
+          });
+
+          // Perform a sort.
+          self.accounts = lodash.sortBy(self.accounts, function(a) {
+            return a.sort;
+          });
+        }
+
+      }).catch(function(error) {
+        $log.error('Coinbase.getAccounts(): ' + error.message + ', ' + error.detail);
+        throw new Error(error.message);
+        
+      });
+    };
+
+    this.getCurrentUser = function() {
+      var request = {
+        method: 'GET',
+        url: apiRoot + '/user',
+        opts: {
+          cancelOn: [401]
+        }
+      };
+
+      return new ApiMessage(request).send().then(function(response) {
+        return new User(response.data);
 
       }).catch(function(error) {
         $log.error('Coinbase.getCurrentUser():' + error.message + ', ' + error.detail);
@@ -153,11 +200,23 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
     this.getPaymentMethods = function() {
       var request = {
         method: 'GET',
-        url: apiRoot + '/payment-methods'
+        url: apiRoot + '/paymentMethods',
+        opts: {
+          cancelOn: [401]
+        }
       };
 
       return new ApiMessage(request).send().then(function(response) {
-        return response.data;
+        if (response.data) {
+          var paymentMethodObjs = response.data;
+          self.paymentMethods = [];
+
+          lodash.forEach(paymentMethodObjs, function(paymentMethod) {
+            self.paymentMethods.push(new PaymentMethod(paymentMethod));
+          });
+        }
+
+        return self.paymentMethods;
 
       }).catch(function(error) {
         $log.error('Coinbase.getPaymentMethods():' + error.message + ', ' + error.detail);
@@ -195,7 +254,10 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
     this.buyPrice = function(currency) {
       var request = {
         method: 'GET',
-        url: apiRoot + '/prices/buy/' + currency
+        url: apiRoot + '/prices/buy/' + currency,
+        opts: {
+          cancelOn: [401]
+        }
       };
 
       return new ApiMessage(request).send().then(function(response) {
@@ -211,7 +273,10 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
     this.sellPrice = function(currency) {
       var request = {
         method: 'GET',
-        url: apiRoot + '/prices/sell/' + currency
+        url: apiRoot + '/prices/sell/' + currency,
+        opts: {
+          cancelOn: [401]
+        }
       };
 
       return new ApiMessage(request).send().then(function(response) {
@@ -227,7 +292,10 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
     this.spotPrice = function() {
       var request = {
         method: 'GET',
-        url: apiRoot + '/prices/spot'
+        url: apiRoot + '/prices/spot',
+        opts: {
+          cancelOn: [401]
+        }
       };
 
       return new ApiMessage(request).send().then(function(response) {
@@ -243,7 +311,10 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
     this.historicPrice = function(currencyPair, period) {
       var request = {
         method: 'GET',
-        url: apiRoot + '/prices/historic/' + currencyPair + '/' + period
+        url: apiRoot + '/prices/historic/' + currencyPair + '/' + period,
+        opts: {
+          cancelOn: [401]
+        }
       };
 
       return new ApiMessage(request).send().then(function(response) {
@@ -259,7 +330,10 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
     this.exchangeRates = function(currency) {
       var request = {
         method: 'GET',
-        url: apiRoot + '/exchange-rates/' + (currency || 'USD')
+        url: apiRoot + '/exchange-rates/' + (currency || 'USD'),
+        opts: {
+          cancelOn: [401]
+        }
       };
 
       return new ApiMessage(request).send().then(function(response) {
@@ -275,7 +349,10 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
     this.getPendingTransactions = function() {
       var request = {
         method: 'GET',
-        url: apiRoot + '/transactions/pending'
+        url: apiRoot + '/transactions/pending',
+        opts: {
+          cancelOn: [401]
+        }
       };
 
       return new ApiMessage(request).send().then(function(response) {
@@ -295,6 +372,9 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
         data: {
           tx: tx,
           options: options
+        },
+        opts: {
+          cancelOn: [401]
         }
       };
 
@@ -312,7 +392,7 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
      * Private functions
      */
 
-    function doConnect(oauthCode) {
+    function doLogin(oauthCode) {
       var request = {
         method: 'PUT',
         url: apiRoot + '/service',
@@ -324,26 +404,19 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
       };
 
       return new ApiMessage(request).send().then(function(response) {
-        self.urls = response.data.info.urls;
+        self.urls = lodash.get(response, 'data.info.urls', []);
 
-        // If there is no account then we are not paired with our Coinbase account; don't create an account instance.
-        if (response.data.accounts) {
-          self.accounts = [];
-          lodash.forEach(response.data.accounts, function(account) {
-            self.accounts.push(new Account(account, self));
-          });
+        self.getAccounts().then(function() {
+          onCoinbaseLogin();
 
-          // Perform a sort.
-          self.accounts = lodash.sortBy(self.accounts, function(a) {
-            return a.sort;
-          });
-        }
+        }).catch(function(error) {
+          onCoinbaseLogin(error);
 
-        onCoinbaseConnect();
+        });
 
       }).catch(function(error) {
-        $log.error('Coinbase.connect():' + error.message + ', ' + error.detail);
-        onCoinbaseConnect(error);
+        $log.error('Coinbase.doLogin():' + error.message + ', ' + error.detail);
+        onCoinbaseLogin(error);
 
       });
     };

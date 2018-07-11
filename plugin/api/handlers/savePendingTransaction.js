@@ -23,8 +23,8 @@ angular.module('owsWalletPlugin.apiHandlers').service('savePendingTransaction', 
     coinbaseService.savePendingTransaction(tx, options, function(error) {
       if (error) {
         message.response = {
-          statusCode: 500,
-          statusText: 'UNEXPECTED_ERROR',
+          statusCode: error.statusCode || 500,
+          statusText: error.statusText || 'UNEXPECTED_ERROR',
           data: {
             message: error.message
           }

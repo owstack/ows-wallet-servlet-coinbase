@@ -8,55 +8,29 @@ angular.module('owsWalletPlugin.apiHandlers').service('getAccounts', function(co
     // Request parameters.
     var accountId = message.request.params.accountId;
 
-    if (accountId) {
-      // Get a single account by id.
-      coinbaseService.getAccounts().then(function(response) {
+    // If accountId then one account is returned, else all accounts are returned.
+    coinbaseService.getAccounts(accountId).then(function(response) {
 
-        message.response = {
-          statusCode: 200,
-          statusText: 'OK',
-          data: response
-        };
-        return callback(message);
+      message.response = {
+        statusCode: 200,
+        statusText: 'OK',
+        data: response
+      };
+      return callback(message);
 
-      }).catch(function(error) {
+    }).catch(function(error) {
 
-        message.response = {
-          statusCode: 500,
-          statusText: 'UNEXPECTED_ERROR',
-          data: {
-            message: error.message
-          }
-        };
-        return callback(message);
+      message.response = {
+        statusCode: error.statusCode || 500,
+        statusText: error.statusText || 'UNEXPECTED_ERROR',
+        data: {
+          message: error.message
+        }
+      };
+      return callback(message);
 
-      });
+    });
 
-    } else {
-      // Get a collection of accounts.
-      coinbaseService.getAccounts().then(function(response) {
-
-        message.response = {
-          statusCode: 200,
-          statusText: 'OK',
-          data: response
-        };
-        return callback(message);
-
-      }).catch(function(error) {
-
-        message.response = {
-          statusCode: 404,
-          statusText: 'UNEXPECTED_ERROR',
-          data: {
-            message: error.message
-          }
-        };
-        return callback(message);
-
-      });
-
-    }
 	};
 
   return root;

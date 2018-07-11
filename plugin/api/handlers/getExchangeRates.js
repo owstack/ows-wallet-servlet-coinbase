@@ -20,8 +20,8 @@ angular.module('owsWalletPlugin.apiHandlers').service('getExchangeRates', functi
     }).catch(function(error) {
 
       message.response = {
-        statusCode: 404,
-        statusText: 'UNEXPECTED_ERROR',
+        statusCode: error.statusCode || 500,
+        statusText: error.statusText || 'UNEXPECTED_ERROR',
         data: {
           message: error.message
         }

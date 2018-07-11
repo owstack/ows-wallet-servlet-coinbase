@@ -56,10 +56,10 @@ angular.module('owsWalletPlugin.apiHandlers').service('service', function(coinba
         }).catch(function(error) {
 
           message.response = {
-            statusCode: 500,
-            statusText: 'UNEXPECTED_ERROR',
+            statusCode: error.statusCode || 500,
+            statusText: error.statusText || 'UNEXPECTED_ERROR',
             data: {
-              message: error
+              message: error.message
             }
           };
           return callback(message);
@@ -73,7 +73,7 @@ angular.module('owsWalletPlugin.apiHandlers').service('service', function(coinba
        */
       case 'logout':
 
-        coinbaseService.logout(clientId).then(function() {
+        coinbaseService.logout().then(function() {
 
           message.response = {
             statusCode: 200,
@@ -85,8 +85,8 @@ angular.module('owsWalletPlugin.apiHandlers').service('service', function(coinba
         }).catch(function(error) {
 
           message.response = {
-            statusCode: 500,
-            statusText: 'UNEXPECTED_ERROR',
+            statusCode: error.statusCode || 500,
+            statusText: error.statusText || 'UNEXPECTED_ERROR',
             data: {
               message: error.message
             }

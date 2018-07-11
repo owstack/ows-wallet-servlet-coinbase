@@ -7,7 +7,7 @@ angular.module('owsWalletPlugin.apiHandlers').service('requestBuy', function(coi
   root.respond = function(message, callback) {
     // Request parameters.
     var accountId = message.request.params.accountId;
-    var data = message.request.data.data;
+    var data = message.request.data;
 
     if (!accountId) {
       message.response = {
@@ -20,7 +20,7 @@ angular.module('owsWalletPlugin.apiHandlers').service('requestBuy', function(coi
       return callback(message);
     };
 
-    coinbaseService.requestBuy(accountId, data).then(function(response) {
+    coinbaseService.buyRequest(accountId, data).then(function(response) {
 
       message.response = {
         statusCode: 200,
@@ -32,8 +32,8 @@ angular.module('owsWalletPlugin.apiHandlers').service('requestBuy', function(coi
     }).catch(function(error) {
 
       message.response = {
-        statusCode: 500,
-        statusText: 'UNEXPECTED_ERROR',
+        statusCode: error.statusCode || 500,
+        statusText: error.statusText || 'UNEXPECTED_ERROR',
         data: {
           message: error.message
         }

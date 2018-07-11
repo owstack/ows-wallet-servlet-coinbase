@@ -5,21 +5,24 @@ angular.module('owsWalletPlugin.apiHandlers').service('getPaymentMethods', funct
 	var root = {};
 
   root.respond = function(message, callback) {
+    // Request parameters.
+    var paymentMethodId = message.request.params.paymentMethodId;
 
-    coinbaseService.getPaymentMethods(accountId).then(function(response) {
+    // If paymentMethodId then one payment mathod is returned, else all payment methods are returned.
+    coinbaseService.getPaymentMethods(paymentMethodId).then(function(response) {
 
       message.response = {
         statusCode: 200,
         statusText: 'OK',
-        data: txs
+        data: response
       };
       return callback(message);
 
     }).catch(function(error) {
 
       message.response = {
-        statusCode: 500,
-        statusText: 'UNEXPECTED_ERROR',
+        statusCode: error.statusCode || 500,
+        statusText: error.statusText || 'UNEXPECTED_ERROR',
         data: {
           message: error.message
         }

@@ -33,6 +33,30 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
     label: 'Litecoin'
   }];
 
+  // These errors from Coinbase indicate that the user is not authorized to access the Coinbase service.
+  // A new token must be obtained to restore access.
+  var oauthErrors = [{
+    coinbaseId: 'expired_token',
+    message: 'Token expired',
+    statusCode: 401,
+    statusText: 'UNAUTHORIZED_EXPIRED'
+  }, {
+    coinbaseId: 'revoked_token',
+    message: 'Token revoked',
+    statusCode: 401,
+    statusText: 'UNAUTHORIZED_REVOKED'
+  }, {
+    coinbaseId: 'invalid_token',
+    message: 'Token invalid',
+    statusCode: 401,
+    statusText: 'UNAUTHORIZED_INVALID'
+  }, {
+    coinbaseId: 'invalid_grant',
+    message: 'Authorization grant is invalid',
+    statusCode: 401,
+    statusText: 'UNAUTHORIZED_GRANT'
+  }];
+
   /**
    * Processing flow for accessing a Coinbase account.
    *
@@ -45,13 +69,6 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
    * a Coinbase API access token.
    *
    * If Coinbase responds with an access token then we save it locally.
-   *
-   * Finally, we send an event to the subscribers (typically the Coinbase applet) that a Coinbase token has been received.
-   *
-   *   event: {
-   *     name: 'coinbase.oauth',
-   *     data: {status, message}
-   *   }
    */
 
   // Listen for account pairing events (incoming oauth code from Coinbase authorization by user).
@@ -79,10 +96,14 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
   root.init = function(clientId, config, oauthCode) {
     return new Promise(function(resolve, reject) {
 
-      // Use plugin configuration to setup for communicating with Coinbase.
-      if (config) {
-        setCredentials(config);
+      if (!config) {
+        var error = 'Could not initialize API service: no plugin configuration provided';
+        $log.error(error);
+        reject(error);
       }
+
+      // Use plugin configuration to setup for communicating with Coinbase.
+      setCredentials(config);
 
       // Setup access to our storage space; use clientId to create a unique name space.
       storage = new Storage([
@@ -91,44 +112,57 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
         'txs'
       ], clientId);
 
-      Settings.get().then(function(settings) {
-        // Gather some additional information for the client. This information only during this initialization sequence.
-        var info = {};
-        info.urls = getUrls();
+      // Gather some additional information for the client. This information only during this initialization sequence.
+      var info = {};
+      info.urls = getUrls();
 
-        if (oauthCode) {
-          // Use the oauthCode to get an API token followed by getting the account ID.
-          getToken(oauthCode).then(function() {
-            // Got the API token (saved to storage).
-            return getAccounts();
-
-          }).then(function(accounts) {
-            return resolve({
-              accounts: accounts,
-              info: info
-            });
-
+      // Providing an oauth code is optional; the client may require it.
+      if (oauthCode) {
+        // Use the oauthCode to get an API token followed by getting the account ID.
+        getToken(oauthCode).then(function() {
+          // Got the API token (saved to storage).
+          return resolve({
+            info: info
           });
 
-        } else {
-          getAccounts().then(function(accounts) {
-            return resolve({
-              accounts: accounts,
-              info: info
+        }).catch(function(error) {
+          var oauthError = lodash.intersectionWith(oauthErrors, [error], function(val1, val2) {
+            return val1.coinbaseId == val2.id;
+          });
+
+          if (oauthError) {
+            // There should only be one error in the array.
+            oauthError = oauthError[0];
+
+            return reject({
+              id: oauthError.coinbaseId,
+              message: oauthError.message,
+              statusCode: oauthError.statusCode,
+              statusText: oauthError.statusText
             });
 
+          } else {
+            // Unexpected error.
+            return reject(error);
+          };
+        });
+
+      } else {
+
+        getTokenFromStorage().then(function(accessToken) {
+
+          createCoinbaseApiProvider(accessToken);
+
+          return resolve({
+            info: info
           });
-        }
+        });
 
-      }).catch(function(error) {
-        $log.error('Could not initialize API service: ' + error);
-        reject(error);
-      });
-
+      }
     });
   };
 
-  root.logout = function() {
+  root.logout = function(reason) {
     return new Promise(function(resolve, reject) {
       storage.removeAccessToken().then(function() {
         return storage.removeRefreshToken();
@@ -137,6 +171,13 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
         return storage.removeTxs();
 
       }).then(function() {
+        $log.info('Logged out of Coinbase.');
+
+        // Logged out. Broadcast a logout event to interested plugins.
+        session.broadcastEvent('coinbase.logout', {
+          reason: reason || 'USER_REQUESTED'
+        });
+
         resolve();
 
       }).catch(function(error) {
@@ -155,34 +196,20 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       coinbaseApi.get('exchange-rates?currency=' + currency).then(function(response) {
         var data = response.data.data.rates;
         resolve(data);
-      }).catch(function(error) {
-        $log.error('Coinbase: getExchangeRates ' + error.status + '. ' + getErrorsAsString(error.data));
-        reject(error.data);
+      }).catch(function(response) {
+        reject(getError(response, 'getExchangeRates'));
       });
     });
   };
 
-  function doGetAccounts() {
+  root.getAccounts = function(accountId) {
     return new Promise(function(resolve, reject) {
-      coinbaseApi.get('accounts/').then(function(response) {
+      coinbaseApi.get('accounts/' + (accountId ? accountId : '')).then(function(response) {
         // Response object returns with pagination; access the accounts array only.
         var data = response.data.data;
         resolve(data);
-      }).catch(function(error) {
-        $log.error('Coinbase: doGetAccounts ' + error.status + '. ' + getErrorsAsString(error.data));
-        reject(error.data);
-      });
-    });
-  };
-
-  root.getAccount = function(accountId) {
-    return new Promise(function(resolve, reject) {
-      coinbaseApi.get('accounts/' + accountId).then(function(response) {
-        var data = response.data.data;
-        resolve(data);
-      }).catch(function(error) {
-        $log.error('Coinbase: getAccount ' + error.status + '. ' + getErrorsAsString(error.data));
-        reject(error.data);
+      }).catch(function(response) {
+        reject(getError(response, 'getAccounts'));
       });
     });
   };
@@ -192,9 +219,19 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       coinbaseApi.get('user/').then(function(response) {
         var data = response.data.data;
         resolve(data);
-      }).catch(function(error) {
-        $log.error('Coinbase: getCurrentUser ' + error.status + '. ' + getErrorsAsString(error.data));
-        reject(error.data);
+      }).catch(function(response) {
+        reject(getError(response, 'getCurrentUser'));
+      });
+    });
+  };
+
+  root.getUserAuth = function() {
+    return new Promise(function(resolve, reject) {
+      coinbaseApi.get('user/auth').then(function(response) {
+        var data = response.data.data;
+        resolve(data);
+      }).catch(function(response) {
+        reject(getError(response, 'getUserAuth'));
       });
     });
   };
@@ -204,9 +241,8 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       coinbaseApi.get('accounts/' + accountId + '/buys/' + buyId).then(function(response) {
         var data = response.data.data;
         resolve(data);
-      }).catch(function(error) {
-        $log.error('Coinbase: getBuyOrder ' + error.status + '. ' + getErrorsAsString(error.data));
-        reject(error.data);
+      }).catch(function(response) {
+        reject(getError(response, 'getBuyOrder'));
       });
     });
   };
@@ -216,9 +252,8 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       coinbaseApi.get('accounts/' + accountId + '/transactions/' + transactionId).then(function(response) {
         var data = response.data.data;
         resolve(data);
-      }).catch(function(error) {
-        $log.error('Coinbase: getTransaction ' + error.status + '. ' + getErrorsAsString(error.data));
-        reject(error.data);
+      }).catch(function(response) {
+        reject(getError(response, 'getTransaction'));
       });
     });
   };
@@ -228,9 +263,8 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       coinbaseApi.get('accounts/' + accountId + '/addresses/' + addressId + '/transactions').then(function(response) {
         var data = response.data;
         resolve(data);
-      }).catch(function(error) {
-        $log.error('Coinbase: GET Access Token ERROR ' + error.status + '. ' + getErrorsAsString(error.data));
-        reject(error.data);
+      }).catch(function(response) {
+        reject(getError(response, 'getAddressTransactions'));
       });
     });
   };
@@ -240,9 +274,8 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       coinbaseApi.get('accounts/' + accountId + '/transactions').then(function(response) {
         var data = response.data.data;
         resolve(data);
-      }).catch(function(error) {
-        $log.error('Coinbase: getTransactions ' + error.status + '. ' + getErrorsAsString(error.data));
-        reject(error.data);
+      }).catch(function(response) {
+        reject(getError(response, 'getTransactions'));
       });
     });
   };
@@ -252,9 +285,8 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       coinbaseApi.get(url.replace('/v2', '')).then(function(response) {
         var data = response.data;
         resolve(data);
-      }).catch(function(error) {
-        $log.error('Coinbase: paginationTransactions ' + error.status + '. ' + getErrorsAsString(error.data));
-        reject(error.data);
+      }).catch(function(response) {
+        reject(getError(response, 'paginationTransactions'));
       });
     });
   };
@@ -264,9 +296,8 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       coinbaseApi.get('prices/sell?currency=' + currency).then(function(response) {
         var data = response.data.data;
         resolve(data);
-      }).catch(function(error) {
-        $log.error('Coinbase: sellPrice ' + error.status + '. ' + getErrorsAsString(error.data));
-        reject(error.data);
+      }).catch(function(response) {
+        reject(getError(response, 'sellPrice'));
       });
     });
   };
@@ -276,9 +307,8 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       coinbaseApi.get('prices/buy?currency=' + currency).then(function(response) {
         var data = response.data.data;
         resolve(data);
-      }).catch(function(error) {
-        $log.error('Coinbase: buyPrice ' + error.status + '. ' + getErrorsAsString(error.data));
-        reject(error.data);
+      }).catch(function(response) {
+        reject(getError(response, 'buyPrice'));
       });
     });
   };
@@ -311,11 +341,11 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
             resolve(result);
           }
 
-        }).catch(function(error) {
-          $log.error('Coinbase: spotPrice ' + error.status + '. ' + getErrorsAsString(error.data));
+        }).catch(function(response) {
+          getError(response, 'spotPrice');
 
           result[c.pair] = {};
-          result[c.pair].error = error;
+          result[c.pair].error = error.message;
 
           count--;
           if (count == 0) {
@@ -332,21 +362,19 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       coinbaseApi.get('prices/' + currencyPair + '/historic?period=' + period).then(function(response) {
         var data = response.data.data;
         resolve(data);
-      }).catch(function(error) {
-        $log.error('Coinbase: historicPrice ' + error.status + '. ' + getErrorsAsString(error.data));
-        reject(error.data);
+      }).catch(function(response) {
+        reject(getError(response, 'historicPrice'));
       });
     });
   };
 
-  root.getPaymentMethods = function() {
+  root.getPaymentMethods = function(paymentMethodId) {
     return new Promise(function(resolve, reject) {
-      coinbaseApi.get('payment-methods/').then(function(response) {
+      coinbaseApi.get('payment-methods/' + (paymentMethodId ? paymentMethodId : '')).then(function(response) {
         var data = response.data.data;
         resolve(data);
-      }).catch(function(error) {
-        $log.error('Coinbase: getPaymentMethods ' + error.status + '. ' + getErrorsAsString(error.data));
-        reject(error.data);
+      }).catch(function(response) {
+        reject(getError(response, 'getPaymentMethods'));
       });
     });
   };
@@ -356,9 +384,8 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       coinbaseApi.get('payment-methods/' + paymentMethodId).then(function(response) {
         var data = response.data;
         resolve(data);
-      }).catch(function(error) {
-        $log.error('Coinbase: getPaymentMethod ' + error.status + '. ' + getErrorsAsString(error.data));
-        reject(error.data);
+      }).catch(function(response) {
+        reject(getError(response, 'getPaymentMethod'));
       });
     });
   };
@@ -376,9 +403,8 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       coinbaseApi.post('accounts/' + accountId + '/sells', data).then(function(response) {
         var data = response.data.data;
         resolve(data);
-      }).catch(function(error) {
-        $log.error('Coinbase: sellRequest ' + error.status + '. ' + getErrorsAsString(error.data));
-        reject(error.data);
+      }).catch(function(response) {
+        reject(getError(response, 'sellRequest'));
       });
     });
   };
@@ -388,9 +414,8 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       coinbaseApi.post('accounts/' + accountId + '/sells/' + sellId + '/commit').then(function(response) {
         var data = response.data;
         resolve(data);
-      }).catch(function(error) {
-        $log.error('Coinbase: sellCommit ' + error.status + '. ' + getErrorsAsString(error.data));
-        reject(error.data);
+      }).catch(function(response) {
+        reject(getError(response, 'sellCommit'));
       });
     });
   };
@@ -400,7 +425,7 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       var data = {
         amount: requestData.amount,
         currency: requestData.currency,
-        payment_method: requestData.payment_method || null,
+        paymentMethodId: requestData.paymentMethodId || null,
         commit: requestData.commit || false,
         quote: requestData.quote || false
       };
@@ -408,9 +433,8 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       coinbaseApi.post('accounts/' + accountId + '/buys', data).then(function(response) {
         var data = response.data.data;
         resolve(data);
-      }).catch(function(error) {
-        $log.error('Coinbase: buyRequest ' + error.status + '. ' + getErrorsAsString(error.data));
-        reject(error.data);
+      }).catch(function(response) {
+        reject(getError(response, 'buyRequest'));
       });
     });
   };
@@ -420,9 +444,8 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       coinbaseApi.post('accounts/' + accountId + '/buys/' + buyId + '/commit').then(function(response) {
         var data = response.data;
         resolve(data);
-      }).catch(function(error) {
-        $log.error('Coinbase: GET Access Token ERROR ' + error.status + '. ' + getErrorsAsString(error.data));
-        reject(error.data);
+      }).catch(function(response) {
+        reject(getError(response, 'buyCommit'));
       });
     });
   };
@@ -436,9 +459,8 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       coinbaseApi.post('accounts/' + accountId + '/addresses', data).then(function(response) {
         var data = response.data.data;
         resolve(data);
-      }).catch(function(error) {
-        $log.error('Coinbase: buyCommit ' + error.status + '. ' + getErrorsAsString(error.data));
-        reject(error.data);
+      }).catch(function(response) {
+        reject(getError(response, 'createAddress'));
       });
     });
   };
@@ -456,9 +478,8 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       coinbaseApi.post('accounts/' + accountId + '/transactions', data).then(function(response) {
         var data = response.data.data;
         resolve(data);
-      }).catch(function(error) {
-        $log.error('Coinbase: sendTo ' + error.status + '. ' + getErrorsAsString(error.data));
-        reject(error.data);
+      }).catch(function(response) {
+        reject(getError(response, 'sendTo'));
       });
     });
   };
@@ -468,9 +489,8 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       coinbaseApi.get('accounts/' + accountId + '/transactions').then(function(response) {
         var data = response.data.data;
         resolve(data);
-      }).catch(function(error) {
-        $log.error('Coinbase: getAccountTransactions ' + error.status + '. ' + getErrorsAsString(error.data));
-        reject(error.data);
+      }).catch(function(response) {
+        reject(getError(response, 'getAccountTransactions'));
       });
     });
   };
@@ -596,7 +616,7 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       return storage.setTxs(tx);
 
     }).catch(function(error) {
-      return cb(err);
+      return cb(error);
 
     });
   };
@@ -620,7 +640,8 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       'wallet:transactions:read,' +
       'wallet:transactions:send,' +
 //TODO      'wallet:transactions:send:bypass-2fa,' +
-      'wallet:payment-methods:read';
+      'wallet:payment-methods:read,' +
+      'wallet:payment-methods:limits';
 
     if (isCordova) {
       credentials.REDIRECT_URI = config.redirect_uri.mobile;
@@ -659,6 +680,78 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
         'CB-VERSION': credentials.API_VERSION,
         'Authorization': 'Bearer ' + accessToken
       }
+    }, oauthRefresh);
+  };
+
+  function oauthRefresh(response) {
+    return new Promise(function(resolve, reject) {
+      var error = response.data;
+
+      // Check for a Coinbase error reponse. If not then return, otherwise continue.
+      if (!error.errors || (error.errors && !lodash.isArray(error.errors))) {
+        return reject(response);
+      }
+
+      // There is a Coinbase error, check to see if the access token is the cause.
+      var oauthError = lodash.intersectionWith(oauthErrors, error.errors, function(val1, val2) {
+        return val1.coinbaseId == val2.id;
+      });
+
+      if (oauthError.length > 0) {
+        // There should only be one error in the array.
+        oauthError = oauthError[0];
+
+        switch (oauthError.coinbaseId) {
+          case 'expired_token':
+            $log.info(oauthError.message + ': refreshing access token');
+
+            refreshToken().then(function() {
+              return resolve();
+
+            }).catch(function(error) {
+              $log.warn('Failed to refresh token, logging out');
+              root.logout(oauthError.statusText);
+
+              return reject({
+                data: {
+                  errors: [{
+                    id: oauthError.coinbaseId,
+                    message: oauthError.message + ': ' + error,
+                    statusCode: oauthError.statusCode,
+                    statusText: oauthError.statusText
+                  }]
+                }
+              });
+            });
+            break;
+
+          case 'revoked_token':
+          case 'invalid_token':
+          case 'invalid_grant':
+            $log.warn(oauthError.message + ': logging out');
+            root.logout(oauthError.statusText);
+
+            return reject({
+              data: {
+                errors: [{
+                  id: oauthError.coinbaseId,
+                  message: oauthError.message,
+                  statusCode: oauthError.statusCode,
+                  statusText: oauthError.statusText
+                }]
+              }
+            });
+            break;
+
+          default:
+            // Should never happen.
+            return reject(response);
+        };
+
+      } else {
+        // Not an oauth error.
+        return reject(response);
+      }
     });
   };
 
@@ -675,15 +768,21 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       coinbaseHost.post('oauth/token/', data).then(function(response) {
         var data = response.data;
         if (data && data.access_token && data.refresh_token) {
-          saveToken(data.access_token, data.refresh_token, function() {
+          saveToken(data.access_token, data.refresh_token, function(error, accessToken) {
+            if (error) {
+              return reject(getError('Could not save the access token', 'getToken'));
+            }
+
+            // Re-orient the api provider using the token.
+            createCoinbaseApiProvider(accessToken);
             return resolve();
 
           });
         } else {
-          return reject('Could not get the access token');
+          return reject(getError('No access token in response', 'getToken'));
         }
-      }).catch(function(error) {
-        return reject('Could not get the access token: ' + error.status + ', ' + getErrorsAsString(error.data));
+      }).catch(function(response) {
+        reject(getError(response, 'getToken'));
       });
     });
   };
@@ -691,12 +790,10 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
   function getTokenFromStorage() {
     return new Promise(function(resolve, reject) {
       storage.getAccessToken().then(function(accessToken) {
-
-        createCoinbaseApiProvider(accessToken);
         resolve(accessToken);
 
       }).catch(function(error) {
-        reject(error);
+        reject(getError(response, 'getTokenFromStorage'));
       });
     });
   };
@@ -706,13 +803,10 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       return storage.setRefreshToken(refreshToken);
 
     }).then(function() {
-
-      // Have a new token, create (or recreate) the API provider.
-      createCoinbaseApiProvider(accessToken);
-      return cb();
+      return cb(null, accessToken);
 
     }).catch(function(error) {
-      $log.error('Coinbase: saveToken ' + error.status + '. ' + getErrorsAsString(error.data));
+      $log.error('Coinbase: saveToken ' + error);
       return cb(error);
     });
   };
@@ -732,19 +826,23 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
         coinbaseHost.post('oauth/token/', data).then(function(response) {
           var data = response.data;
           if (data && data.access_token && data.refresh_token) {
-            saveToken(data.access_token, data.refresh_token, function() {
+            saveToken(data.access_token, data.refresh_token, function(accessToken) {
+
+              // Re-orient the api provider using the token.
+              createCoinbaseApiProvider(accessToken);
               $log.info('Successfully refreshed token from Coinbase');
+
               return resolve();
             });
           } else {
-            return reject('Could not get the access token');
+            return reject(getError('Could not get the access token', 'refreshToken'));
           }
-        }).catch(function(error) {
-          return reject('Could not get the access token: ' + error.status + ', ' + getErrorsAsString(error.data));
+        }).catch(function(response) {
+          return reject(getError(response, 'refreshToken'));
         });
 
       }).catch(function(error) {
-        return reject('Could not get refresh token from storage: ' + error);
+        return reject(getError('Could not get refresh token from storage: ' + error), 'refreshToken');
       });
     });
   };
@@ -767,76 +865,7 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
     };
   };
 
-  function getAccounts() {
-    return new Promise(function(resolve, reject) {
-      $log.debug('Accessing Coinbase account...');
-
-      getTokenFromStorage().then(function(accessToken) {
-        if (!accessToken) {
-          $log.warn('No access token while trying to access account');
-          return resolve();
-
-        } else {
-          doGetAccounts().then(function(accounts) {
-            return resolve(accounts);
-
-          }).catch(function(error) {
-
-            // Check for a Coinbase error reponse. If not then return otherwise continue.
-            if (!error.errors || (error.errors && !lodash.isArray(error.errors))) {
-              return reject('Could not get account id: ' + error);
-            }
-
-            // There is a Coinbase error, check to see if the access token is expired.
-            var expiredToken;
-            var revokedToken;
-            var invalidToken;
-            for (var i = 0; i < error.errors.length; i++) {
-              expiredToken = (error.errors[i].id == 'expired_token');
-              revokedToken = (error.errors[i].id == 'revoked_token');
-              invalidToken = (error.errors[i].id == 'invalid_token');
-            }
-
-            // Refresh an expired access token and retrieve the account ID.
-            // The results are stored and the account ID is returned, otherwise an error is returned.
-            if (expiredToken) {
-              $log.debug('Refreshing access token');
-
-              refreshToken().then(function() {
-                return doGetAccounts();
-
-              }).then(function(accounts) {
-                return resolve(accounts);
-
-              }).catch(function(error) {
-                return reject('Could not refresh access token: ' + error);
-
-              });
-
-            } else if (revokedToken) {
-              $log.debug('Token revoked, logging out');
-              root.logout();
-              return resolve(); // No access token
-
-            } else if (invalidToken) {
-              $log.debug('Token invalid, logging out');
-              root.logout();
-              return resolve(); // No access token
-
-            } else {
-              return reject('Unexpected error getting account id: ' + getErrorsAsString(error));
-            }
-          });
-        }
-
-      }).catch(function(error) {
-        return reject('Unexpected error getting account id: ' + getErrorsAsString(error));
-
-      });
-    });
-  };
-  
-  function updatePendingTransactions(obj /*, …*/ ) {
+  function updatePendingTransactions(obj /*, ...*/ ) {
     for (var i = 1; i < arguments.length; i++) {
       for (var prop in arguments[i]) {
         var val = arguments[i][prop];
@@ -905,10 +934,10 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
         }).catch(function(error) {
           root.savePendingTransaction(tx, {
             status: 'error',
-            error: err
-          }, function(err) {
-            if (err) {
-              $log.error(err);
+            error: error
+          }, function(error) {
+            if (error) {
+              $log.error(error);
             }
             refreshTransactions(pendingTransactions);
             cb(pendingTransactions);
@@ -920,10 +949,10 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
     }).catch(function(error) {
       root.savePendingTransaction(tx, {
         status: 'error',
-        error: err
-      }, function(err) {
-        if (err) {
-          $log.debug(err);
+        error: error
+      }, function(error) {
+        if (error) {
+          $log.debug(error);
         }
         refreshTransactions(pendingTransactions);
         cb(pendingTransactions);
@@ -988,9 +1017,9 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       }).catch(function(error) {
         root.savePendingTransaction(tx, {
           status: 'error',
-          error: err
-        }, function(err) {
-          if (err) $log.debug(err);
+          error: error
+        }, function(error) {
+          if (error) $log.debug(error);
           refreshTransactions(pendingTransactions);
         });
 
@@ -1011,31 +1040,77 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
     });
   };
 
+  function getError(response, callerId) {
+    // Check for JS error.
+    if (response.message) {
+      return {
+        id: 'unexpected_error',
+        message: response.message
+      }
+    }
+
+    $log.error('Coinbase: ' + callerId + ' - ' + getErrorsAsString(response.data));
+    var error;
+
+    if (response.status && response.status <= 0) {
+      error = {
+        id: 'network_error',
+        message: 'Network connection error'
+      };
+
+    } else {
+      // Typically, Coinbase returns an array of errors with just one element.
+      // Only 'validation_error' may return more than one error.
+      if (response.data.error) {
+        error = {
+          id: response.data.error,
+          message: response.data.error_description
+        };
+
+      } else if (response.data.errors && lodash.isArray(response.data.errors)) {
+        error = response.data.errors[0];
+
+      } else if (response.data) {
+        error = response.data;
+
+      } else {
+        // A simple text string.
+        error = {
+          id: 'unexpected_error',
+          message: response.toString()
+        };
+      }
+
+      return error;
+    }
+  };
+
   function getErrorsAsString(data) {
     var errData;
     try {
-      if (data && data.errors) {
+      if (data && data.errors) { // Generic error format.
         errData = data.errors;
-      } else if (data && data.error) {
+
+      } else if (data && data.error) { // Authentication error format.
         errData = data.error_description;
+
       } else {
         return 'Unknown error';
       }
 
       if (!lodash.isArray(errData)) {
         errData = errData && errData.message ? errData.message : errData;
-        return errData;
-      }
 
-      if (lodash.isArray(errData)) {
+      } else {
         var errStr = '';
         for (var i = 0; i < errData.length; i++) {
           errStr = errStr + errData[i].message + '. ';
         }
-        return errStr;
+        errData = errStr;
       }
 
-      return JSON.stringify(errData);
+      return errData;
+
     } catch(e) {
       $log.error(e);
     };

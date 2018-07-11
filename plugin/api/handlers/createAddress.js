@@ -32,8 +32,8 @@ angular.module('owsWalletPlugin.apiHandlers').service('createAddress', function(
     }).catch(function(error) {
 
       message.response = {
-        statusCode: 500,
-        statusText: 'UNEXPECTED_ERROR',
+        statusCode: error.statusCode || 500,
+        statusText: error.statusText || 'UNEXPECTED_ERROR',
         data: {
           message: error.message
         }
