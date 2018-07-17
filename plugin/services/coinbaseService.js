@@ -57,32 +57,6 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
     statusText: 'UNAUTHORIZED_GRANT'
   }];
 
-  /**
-   * Processing flow for accessing a Coinbase account.
-   *
-   * Typically, the Coinbase applet guides the user to the Coinbase authorization URL. A browser page will load which
-   * explains that the user is providing this app access to their Coinbase account. When the user authorizes access Coinbase
-   * responds using a special URL that is handled by the host app. Since the host app does not have a direct responder for this
-   * Coinbase event it will forward the event on to all running plugins. The event is identified as an 'incoming-data' event,
-   * We receive the event here and check that the event data identifies the event as coming from Coinbase wuthorization. When
-   * a proper event is received we immediately attempt to decode the event to read the oAuth code and exchange the code for
-   * a Coinbase API access token.
-   *
-   * If Coinbase responds with an access token then we save it locally.
-   */
-
-  // Listen for account pairing events (incoming oauth code from Coinbase authorization by user).
-  owswallet.Plugin.onEvent('incoming-data', function(event) {
-    if (event.data && event.data.indexOf('://coinbase') < 0) {
-      return;
-    }
-
-    var oauthCode = Utils.getUrlParameterByName(event.data, 'code');
-    if (oauthCode && oauthCode.length > 0) {
-      root.init(null, oauthCode);
-    }
-  });
-
   // When a new block is seen we update our pending transactions.
   owswallet.Plugin.onEvent('host.new-block', function(event) {
     var network = lodash.get(event, 'event.n.data.network');
