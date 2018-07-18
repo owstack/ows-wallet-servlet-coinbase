@@ -9,14 +9,12 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
 
   /**
    * Constructor.
-   * @param {Object} configId - The configuration ID for the servlet.
    * @param {Function} onLogin - A callback function invoked when an oauth pairing event is received. Called with
-   * the following arguments (error, haveAccount). 'error' specifies that an error occurred during the pairing process.
-   * 'haveAccount' is true if we are paired with an account, false if pairing is still required (has not been done yet).
-   * If an error occurred then 'hasAccount' is undefined.
+   * the following arguments (error). 'error' specifies that an error occurred during the pairing process.
+   * @param {Object} configId - The configuration ID for the servlet.
    * @constructor
    */
-  function Coinbase(configId, onLogin) {
+  function Coinbase(onLogin, configId) {
     var self = this;
 
     var servlet = new PluginAPIHelper(CoinbaseServlet);
