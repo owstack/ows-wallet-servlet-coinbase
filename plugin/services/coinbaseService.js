@@ -657,7 +657,14 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
     }, oauthRefresh);
   };
 
-  function oauthRefresh(response) {
+  function updateCoinbaseApiProviderAuthorization(apiProvider, accessToken) {
+    // Using the access token, create a new provider for making future API requests.
+    apiProvider.setHeaders({
+      'Authorization': 'Bearer ' + accessToken
+    });
+  };
+
+  function oauthRefresh(httpProvider, response) {
     return new Promise(function(resolve, reject) {
       var error = response.data;
 
@@ -679,7 +686,9 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
           case 'expired_token':
             $log.info(oauthError.message + ': refreshing access token');
 
-            refreshToken().then(function() {
+            refreshToken().then(function(newAccessToken) {
+              // Update the active http provider configuration using the new access token.
+              updateCoinbaseApiProviderAuthorization(httpProvider, newAccessToken);
               return resolve();
 
             }).catch(function(error) {
@@ -806,7 +815,7 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
               createCoinbaseApiProvider(accessToken);
               $log.info('Successfully refreshed token from Coinbase');
 
-              return resolve();
+              return resolve(accessToken);
             });
           } else {
             return reject(getError('Could not get the access token', 'refreshToken'));

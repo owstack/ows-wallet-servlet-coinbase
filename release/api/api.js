@@ -87,7 +87,7 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Account', ['$log', 'loda
     };
 
     this.getBalance = function(currency) {
-      return coinbase.exchangeRates(this.balance.amount).then(function(rates) {
+      return coinbase.exchangeRates(currency).then(function(rates) {
         if (!rates[currency]) {
           throw new Error('Could not get account balance, invalid currency: ' + currency);
         }
