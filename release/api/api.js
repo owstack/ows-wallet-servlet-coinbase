@@ -86,14 +86,14 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Account', ['$log', 'loda
       });
     };
 
-    this.getBalance = function(currency) {
-      return coinbase.exchangeRates(currency).then(function(rates) {
-        if (!rates[currency]) {
-          throw new Error('Could not get account balance, invalid currency: ' + currency);
+    this.getBalance = function(altCurrency) {
+      return coinbase.exchangeRates(self.currency.code).then(function(rates) {
+        if (!rates[altCurrency]) {
+          throw new Error('Could not get account balance, invalid currency: ' + altCurrency);
         }
 
-        self.balance.altCurrency = currency;
-        self.balance.altAmount = self.balance.amount * parseFloat(rates[currency]);
+        self.balance.altCurrency = altCurrency;
+        self.balance.altAmount = self.balance.amount * parseFloat(rates[altCurrency]);
         return self.balance.altAmount;
 
       }).catch(function(error) {
@@ -366,22 +366,6 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', ['$log', 'lod
 
     // Attempt to get an authenticated connection using a previously paired state (stored API token).
     doLogin();
-
-    /**
-     * Events
-     */
-
-    // coinbase.oauth - Result of an oauth exchange of code for an API token.
-    //
-    // Applies only to on mobile URI redirect from Coinbase. Event is handled by host app and sent here.
-    owswallet.Plugin.onEvent('coinbase.oauth', function(event) {
-      if (event.data.status == 'ERROR') {
-        $log.error('Could not authenticate with Coinbase: ' + event.data.message);
-        onCoinbaseLogin(event.data.message);
-      } else {
-        onCoinbaseLogin();
-      }
-    });
 
     /**
      * Public functions
@@ -719,13 +703,13 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', ['$log', 'lod
           onCoinbaseLogin();
 
         }).catch(function(error) {
-          onCoinbaseLogin(error);
+          onCoinbaseLogin(lodash.get(error, 'data.message', 'An unexpected error occurred.'));
 
         });
 
       }).catch(function(error) {
         $log.error('Coinbase.doLogin():' + error.message + ', ' + error.detail);
-        onCoinbaseLogin(error);
+        onCoinbaseLogin(lodash.get(error, 'detail', 'An unexpected error occurred.'));
 
       });
     };

@@ -79,14 +79,14 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Account', function ($log
       });
     };
 
-    this.getBalance = function(currency) {
-      return coinbase.exchangeRates(currency).then(function(rates) {
-        if (!rates[currency]) {
-          throw new Error('Could not get account balance, invalid currency: ' + currency);
+    this.getBalance = function(altCurrency) {
+      return coinbase.exchangeRates(self.currency.code).then(function(rates) {
+        if (!rates[altCurrency]) {
+          throw new Error('Could not get account balance, invalid currency: ' + altCurrency);
         }
 
-        self.balance.altCurrency = currency;
-        self.balance.altAmount = self.balance.amount * parseFloat(rates[currency]);
+        self.balance.altCurrency = altCurrency;
+        self.balance.altAmount = self.balance.amount * parseFloat(rates[altCurrency]);
         return self.balance.altAmount;
 
       }).catch(function(error) {

@@ -811,10 +811,7 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
           if (data && data.access_token && data.refresh_token) {
             saveToken(data.access_token, data.refresh_token, function(accessToken) {
 
-              // Re-orient the api provider using the token.
-              createCoinbaseApiProvider(accessToken);
               $log.info('Successfully refreshed token from Coinbase');
-
               return resolve(accessToken);
             });
           } else {

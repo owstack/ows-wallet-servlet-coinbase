@@ -57,22 +57,6 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
     doLogin();
 
     /**
-     * Events
-     */
-
-    // coinbase.oauth - Result of an oauth exchange of code for an API token.
-    //
-    // Applies only to on mobile URI redirect from Coinbase. Event is handled by host app and sent here.
-    owswallet.Plugin.onEvent('coinbase.oauth', function(event) {
-      if (event.data.status == 'ERROR') {
-        $log.error('Could not authenticate with Coinbase: ' + event.data.message);
-        onCoinbaseLogin(event.data.message);
-      } else {
-        onCoinbaseLogin();
-      }
-    });
-
-    /**
      * Public functions
      */
 
@@ -408,13 +392,13 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
           onCoinbaseLogin();
 
         }).catch(function(error) {
-          onCoinbaseLogin(error);
+          onCoinbaseLogin(lodash.get(error, 'data.message', 'An unexpected error occurred.'));
 
         });
 
       }).catch(function(error) {
         $log.error('Coinbase.doLogin():' + error.message + ', ' + error.detail);
-        onCoinbaseLogin(error);
+        onCoinbaseLogin(lodash.get(error, 'detail', 'An unexpected error occurred.'));
 
       });
     };
