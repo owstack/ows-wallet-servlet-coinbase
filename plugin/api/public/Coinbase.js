@@ -392,13 +392,13 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
           onCoinbaseLogin();
 
         }).catch(function(error) {
-          onCoinbaseLogin(lodash.get(error, 'data.message', 'An unexpected error occurred.'));
+          onCoinbaseLogin(error);
 
         });
 
       }).catch(function(error) {
         $log.error('Coinbase.doLogin():' + error.message + ', ' + error.detail);
-        onCoinbaseLogin(lodash.get(error, 'detail', 'An unexpected error occurred.'));
+        onCoinbaseLogin(error);
 
       });
     };
