@@ -93,10 +93,13 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       // Providing an oauth code is optional; the client may require it.
       if (oauthCode) {
         // Use the oauthCode to get an API token followed by getting the account ID.
-        getToken(oauthCode).then(function() {
-          // Got the API token (saved to storage).
+        getToken(oauthCode).then(function(accessToken) {
+          // Even if there is no token we need to set up the api provider for calls not requiring authentication.
+          createCoinbaseApiProvider(accessToken);
+
           return resolve({
-            info: info
+            info: info,
+            authenticated: accessToken ? true : false
           });
 
         }).catch(function(error) {
@@ -124,12 +127,14 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       } else {
 
         getTokenFromStorage().then(function(accessToken) {
-
+          // Even if there is no token we need to set up the api provider for calls not requiring authentication.
           createCoinbaseApiProvider(accessToken);
 
           return resolve({
-            info: info
+            info: info,
+            authenticated: accessToken ? true : false
           });
+
         });
 
       }
@@ -758,7 +763,7 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
 
             // Re-orient the api provider using the token.
             createCoinbaseApiProvider(accessToken);
-            return resolve();
+            return resolve(accessToken);
 
           });
         } else {

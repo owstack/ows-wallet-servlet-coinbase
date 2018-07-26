@@ -699,13 +699,20 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', ['$log', 'lod
       return new ApiMessage(request).send().then(function(response) {
         self.urls = lodash.get(response, 'data.info.urls', []);
 
-        self.getAccounts().then(function() {
+        if (response.data.authenticated == true) {
+
+          self.getAccounts().then(function() {
+            onCoinbaseLogin();
+
+          }).catch(function(error) {
+            onCoinbaseLogin(error);
+
+          });
+
+        } else {
+          // Not authenticated and no errors. Having this.accounts signals successful login.
           onCoinbaseLogin();
-
-        }).catch(function(error) {
-          onCoinbaseLogin(error);
-
-        });
+        }
 
       }).catch(function(error) {
         $log.error('Coinbase.doLogin():' + error.message + ', ' + error.detail);
