@@ -814,7 +814,10 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
         coinbaseHost.post('oauth/token/', data).then(function(response) {
           var data = response.data;
           if (data && data.access_token && data.refresh_token) {
-            saveToken(data.access_token, data.refresh_token, function(accessToken) {
+            saveToken(data.access_token, data.refresh_token, function(error, accessToken) {
+              if (error) {
+                return reject(getError('Could not save the access token', 'refreshToken'));
+              }
 
               $log.info('Successfully refreshed token from Coinbase');
               return resolve(accessToken);
