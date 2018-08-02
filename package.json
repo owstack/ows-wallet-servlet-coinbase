@@ -1,7 +1,7 @@
 {
   "name": "@owstack/ows-wallet-servlet-coinbase",
   "title": "Coinbase",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "An OWS Wallet servlet plugin for Coinbase.",
   "author": "Open Wallet Stack",
   "keywords": [
