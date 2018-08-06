@@ -2,9 +2,10 @@
 
 angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($log, lodash, ApiMessage,
   /* @namespace owsWalletPlugin.api.coinbase */ Account,
+  /* @namespace owsWalletPluginClient.api */ ApiError,
   /* @namespace owsWalletPlugin.api.coinbase */ CoinbaseServlet,
   /* @namespace owsWalletPlugin.api.coinbase */ PaymentMethod,
-  /* @namespace owsWalletPluginClient.api */ PluginAPIHelper,
+  /* @namespace owsWalletPluginClient.api */ PluginApiHelper,
   /* @namespace owsWalletPlugin.api.coinbase */ User) {
 
   /**
@@ -17,7 +18,7 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
   function Coinbase(onLogin, configId) {
     var self = this;
 
-    var servlet = new PluginAPIHelper(CoinbaseServlet);
+    var servlet = new PluginApiHelper(CoinbaseServlet);
     var apiRoot = servlet.apiRoot();
     var config = servlet.getConfig(configId);
 
@@ -50,7 +51,10 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
 
     var onCoinbaseLogin = onLogin;
     if (typeof onCoinbaseLogin != 'function') {
-      throw new Error('You must provide an onLogin function to the constructor');
+      throw {
+        message: 'IMPLEMENTATION_ERROR',
+        detail: 'You must provide an onLogin function to the constructor'
+      };
     }
 
     // Attempt to get an authenticated connection using a previously paired state (stored API token).
@@ -81,8 +85,7 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
         return response.data;
 
       }).catch(function(error) {
-        $log.error('Coinbase.logout():' + error.message + ', ' + error.detail);
-        throw new Error(error.message);
+        throw new ApiError(error);
         
       });
     };
@@ -121,10 +124,9 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
               resolve();
             }
           }).catch(function(error) {
-            $log.error(error);
             count--;
             if (!count) {
-              resolve(); // Just log error and resolve
+              resolve();
             }
           });
         });
@@ -154,8 +156,7 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
         }
 
       }).catch(function(error) {
-        $log.error('Coinbase.getAccounts(): ' + error.message + ', ' + error.detail);
-        throw new Error(error.message);
+        throw new ApiError(error);
         
       });
     };
@@ -173,8 +174,7 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
         return new User(response.data);
 
       }).catch(function(error) {
-        $log.error('Coinbase.getCurrentUser():' + error.message + ', ' + error.detail);
-        throw new Error(error.message);
+        throw new ApiError(error);
         
       });
     };
@@ -201,8 +201,7 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
         return self.paymentMethods;
 
       }).catch(function(error) {
-        $log.error('Coinbase.getPaymentMethods():' + error.message + ', ' + error.detail);
-        throw new Error(error.message);
+        throw new ApiError(error);
         
       });
     };
@@ -246,8 +245,7 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
         return response.data;
 
       }).catch(function(error) {
-        $log.error('Coinbase.buyPrice():' + error.message + ', ' + error.detail);
-        throw new Error(error.message);
+        throw new ApiError(error);
         
       });
     };
@@ -265,8 +263,7 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
         return response.data;
 
       }).catch(function(error) {
-        $log.error('Coinbase.sellPrice():' + error.message + ', ' + error.detail);
-        throw new Error(error.message);
+        throw new ApiError(error);
         
       });
     };
@@ -284,8 +281,7 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
         return response.data;
 
       }).catch(function(error) {
-        $log.error('Coinbase.spotPrice():' + error.message + ', ' + error.detail);
-        throw new Error(error.message);
+        throw new ApiError(error);
         
       });
     };
@@ -303,8 +299,7 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
         return response.data;
 
       }).catch(function(error) {
-        $log.error('Coinbase.historicPrice():' + error.message + ', ' + error.detail);
-        throw new Error(error.message);
+        throw new ApiError(error);
         
       });
     };
@@ -322,8 +317,7 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
         return response.data;
 
       }).catch(function(error) {
-        $log.error('Coinbase.exchangeRates():' + error.message + ', ' + error.detail);
-        throw new Error(error.message);
+        throw new ApiError(error);
         
       });
     };
@@ -341,8 +335,7 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
         return response.data;
 
       }).catch(function(error) {
-        $log.error('Coinbase.getPendingTransactions():' + error.message + ', ' + error.detail);
-        throw new Error(error.message);
+        throw new ApiError(error);
         
       });
     };
@@ -364,8 +357,7 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
         return response.data;
 
       }).catch(function(error) {
-        $log.error('Coinbase.savePendingTransaction():' + error.message + ', ' + error.detail);
-        throw new Error(error.message);
+        throw new ApiError(error);
         
       });
     };
@@ -404,7 +396,6 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
         }
 
       }).catch(function(error) {
-        $log.error('Coinbase.doLogin():' + error.message + ', ' + error.detail);
         onCoinbaseLogin(error);
 
       });

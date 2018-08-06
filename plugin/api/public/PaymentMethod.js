@@ -2,7 +2,7 @@
 
 angular.module('owsWalletPlugin.api.coinbase').factory('PaymentMethod', function (
   /* @namespace owsWalletPlugin.api.coinbase */ CoinbaseServlet,
-  /* @namespace owsWalletPluginClient.api */ PluginAPIHelper,
+  /* @namespace owsWalletPluginClient.api */ PluginApiHelper,
   /* @namespace owsWalletPluginClient.api */ Utils) {
 
   /**
@@ -135,7 +135,7 @@ angular.module('owsWalletPlugin.api.coinbase').factory('PaymentMethod', function
 
     var account = accountObj;
 
-    var servlet = new PluginAPIHelper(CoinbaseServlet);
+    var servlet = new PluginApiHelper(CoinbaseServlet);
     var apiRoot = servlet.apiRoot();
 
     /**

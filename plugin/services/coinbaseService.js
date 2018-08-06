@@ -387,7 +387,7 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       });
     });
   };
-/*
+
   root.sellCommit = function(accountId, sellId) {
     return new Promise(function(resolve, reject) {
       coinbaseApi.post('accounts/' + accountId + '/sells/' + sellId + '/commit').then(function(response) {
@@ -398,7 +398,7 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       });
     });
   };
-*/
+
   root.buyRequest = function(accountId, requestData) {
     return new Promise(function(resolve, reject) {
       var data = {
@@ -417,7 +417,7 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       });
     });
   };
-/*
+
   root.buyCommit = function(accountId, buyId) {
     return new Promise(function(resolve, reject) {
       coinbaseApi.post('accounts/' + accountId + '/buys/' + buyId + '/commit').then(function(response) {
@@ -428,7 +428,7 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       });
     });
   };
-*/
+
   root.createAddress = function(accountId, addressData) {
     return new Promise(function(resolve, reject) {
       var data = {

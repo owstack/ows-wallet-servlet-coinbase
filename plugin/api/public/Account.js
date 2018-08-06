@@ -1,11 +1,12 @@
 'use strict';
 
-angular.module('owsWalletPlugin.api.coinbase').factory('Account', function ($log, lodash, ApiMessage,
+angular.module('owsWalletPlugin.api.coinbase').factory('Account', function (lodash, ApiMessage,
   /* @namespace owsWalletPlugin.api.coinbase */ Address,
+  /* @namespace owsWalletPluginClient.api */ ApiError,
   /* @namespace owsWalletPlugin.api.coinbase */ CoinbaseServlet,
   /* @namespace owsWalletPluginClient.api */ Constants,
   /* @namespace owsWalletPlugin.api.coinbase */ Order,
-  /* @namespace owsWalletPluginClient.api */ PluginAPIHelper,
+  /* @namespace owsWalletPluginClient.api */ PluginApiHelper,
   /* @namespace owsWalletPlugin.api.coinbase */ Transaction,
   /* @namespace owsWalletPluginClient.api */ Utils) {
 
@@ -66,7 +67,7 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Account', function ($log
 
     this.isCryptoCurrency = Constants.isCryptoCurrency(this.currency.code);
 
-    var servlet = new PluginAPIHelper(CoinbaseServlet);
+    var servlet = new PluginApiHelper(CoinbaseServlet);
     var apiRoot = servlet.apiRoot();
 
     /**
@@ -82,7 +83,11 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Account', function ($log
     this.getBalance = function(altCurrency) {
       return coinbase.exchangeRates(self.currency.code).then(function(rates) {
         if (!rates[altCurrency]) {
-          throw new Error('Could not get account balance, invalid currency: ' + altCurrency);
+          throw new ApiError({
+            code: 400,
+            message: 'BAD_REQUEST',
+            detail: 'Could not get account balance, invalid currency: ' + altCurrency
+          });
         }
 
         self.balance.altCurrency = altCurrency;
@@ -90,7 +95,7 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Account', function ($log
         return self.balance.altAmount;
 
       }).catch(function(error) {
-        throw new Error(error.message || error);
+        throw new ApiError(error);
 
       });
     };
@@ -111,31 +116,31 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Account', function ($log
         return new Address(response.data, self);
 
       }).catch(function(error) {
-        $log.error('Account.createAddress():' + error.message + ', ' + error.detail);
-        throw new Error(error.message);
+        throw new ApiError(error);
         
       });
     };
 
     /**
-     * Create a new buy request.
+     * Create a new buy order.
      * @param {Object} data - Buy request data.
-     * @return {Promise<Invoice>} A promise for the buy request transaction.
+     * @return {Promise<Invoice>} A promise for the buy request order.
      *
      * @See https://developers.coinbase.com/api/v2#place-buy-order
      *
      * data = {
      *   amount: [required] <number>,
      *   currency: [required] <string>,
-     *   paymentMethodId: <string>,
-     *   commit: <boolean>,
-     *   quote: <boolean>
+     *   paymentMethodId: <string>
      * }
      */
-    this.buyRequest = function(data) {
+    this.createBuyOrder = function(data) {
+      data.commit = false;
+      data.quote = false;
+
       var request = {
         method: 'POST',
-        url: apiRoot + '/accounts/' + this.id + '/buys',
+        url: apiRoot + '/accounts/' + self.id + '/buys',
         data: data,
         opts: {
           cancelOn: [401]
@@ -143,12 +148,11 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Account', function ($log
       };
 
       return new ApiMessage(request).send().then(function(response) {
-        self.orders.push(new Order(response.data));
+        self.orders.push(new Order(response.data, self));
         return self.orders[self.orders.length-1];
 
       }).catch(function(error) {
-        $log.error('Account.buyRequest():' + error.message + ', ' + error.detail);
-        throw new Error(error.detail);
+        throw new ApiError(error);
         
       });
     };
@@ -166,16 +170,31 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Account', function ($log
         return response.data;
 
       }).catch(function(error) {
-        $log.error('Account.getBuyOrder():' + error.message + ', ' + error.detail);
-        throw new Error(error.message);
+        throw new ApiError(error);
         
       });
     };
 
-    this.sellRequest = function(data) {
+    /**
+     * Create a new sell order.
+     * @param {Object} data - Sell request data.
+     * @return {Promise<Invoice>} A promise for the sell request order.
+     *
+     * @See https://developers.coinbase.com/api/v2#place-sell-order
+     *
+     * data = {
+     *   amount: [required] <number>,
+     *   currency: [required] <string>,
+     *   paymentMethodId: <string>
+     * }
+     */
+    this.createSellOrder = function(data) {
+      data.commit = false;
+      data.quote = false;
+
       var request = {
         method: 'POST',
-        url: apiRoot + '/accounts/' + this.id + '/sells',
+        url: apiRoot + '/accounts/' + self.id + '/sells',
         data: data,
         opts: {
           cancelOn: [401]
@@ -183,12 +202,12 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Account', function ($log
       };
 
       return new ApiMessage(request).send().then(function(response) {
-        return response.data;
+        self.orders.push(new Order(response.data, self));
+        return self.orders[self.orders.length-1];
 
       }).catch(function(error) {
-        $log.error('Account.sellRequest():' + error.message + ', ' + error.detail);
-        throw new Error(error.message);
-        
+        throw new ApiError(error);
+
       });
     };
 
@@ -205,8 +224,7 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Account', function ($log
         return response.data;
 
       }).catch(function(error) {
-        $log.error('Account.getTransaction():' + error.message + ', ' + error.detail);
-        throw new Error(error.message);
+        throw new ApiError(error);
         
       });
     };
@@ -231,8 +249,7 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Account', function ($log
         return self.transactions;
 
       }).catch(function(error) {
-        $log.error('Account.getTransactions():' + error.message + ', ' + error.detail);
-        throw new Error(error.message);
+        throw new ApiError(error);
         
       });
     };

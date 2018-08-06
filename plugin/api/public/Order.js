@@ -1,9 +1,10 @@
 'use strict';
 
-angular.module('owsWalletPlugin.api.coinbase').factory('Order', function ($log, ApiMessage,
+angular.module('owsWalletPlugin.api.coinbase').factory('Order', function (ApiMessage,
+  /* @namespace owsWalletPluginClient.api */ ApiError,
   /* @namespace owsWalletPlugin.api.coinbase */ CoinbaseServlet,
   /* @namespace owsWalletPlugin.api.coinbase */ PaymentMethod,
-  /* @namespace owsWalletPluginClient.api */ PluginAPIHelper,
+  /* @namespace owsWalletPluginClient.api */ PluginApiHelper,
   /* @namespace owsWalletPluginClient.api */ Utils) {
 
   /**
@@ -82,9 +83,15 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Order', function ($log, 
     var orderData = orderData;
     Utils.assign(this, orderData, propertyMap);
 
-    var account = accountObj;
+    this.account = accountObj;
 
-    var servlet = new PluginAPIHelper(CoinbaseServlet);
+    // Use the order total to derive the precise order price (e.g., the precise BTC exchange rate for the order).
+    this.calculatedExchangeRate = {
+      amount: (this.total.amount - this.fee.amount) / this.amount.amount,
+      currency: this.total.currency
+    };
+
+    var servlet = new PluginApiHelper(CoinbaseServlet);
     var apiRoot = servlet.apiRoot();
 
     /**
@@ -92,17 +99,9 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Order', function ($log, 
      */
 
     this.getPaymentMethod = function() {
-      return loadPaymentMethod(this.paymentMethodId);
-    }
-
-    /**
-     * Private functions
-     */
-
-    function loadPaymentMethod(paymentMethodId) {
       var request = {
         method: 'GET',
-        url: apiRoot + '/paymentMethods/' + paymentMethodId,
+        url: apiRoot + '/paymentMethods/' + this.paymentMethodId,
         opts: {
           cancelOn: [401]
         }
@@ -112,8 +111,34 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Order', function ($log, 
         self.paymentMethod = new PaymentMethod(response.data);
 
       }).catch(function(error) {
-        $log.error('Order.loadPaymentMethod():' + error.message + ', ' + error.detail);
-        throw new Error(error.message);
+        throw new ApiError(error);
+        
+      });
+    }
+
+    /**
+     * Confirm this order; either a buy or sell.
+     * @return {Promise<Invoice>} A promise for the confirmed order.
+     *
+     * @See https://developers.coinbase.com/api/v2#place-buy-order
+     */
+    this.confirm = function() {
+      var request = {
+        method: 'POST',
+        url: apiRoot + '/accounts/' + this.account.id + '/' + self.kind + 's/' + self.id + '/commit',
+        data: {},
+        opts: {
+          cancelOn: [401]
+        }
+      };
+
+      return new ApiMessage(request).send().then(function(response) {
+        orderData = response.data.data;
+        Utils.assign(self, orderData, propertyMap);
+        return self;
+
+      }).catch(function(error) {
+        throw new ApiError(error);
         
       });
     };
