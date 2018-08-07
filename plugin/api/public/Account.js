@@ -211,6 +211,39 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Account', function (loda
       });
     };
 
+    /**
+     * Send funds using this account. Used to create and broadcast a cryptocurrency transaction.
+     * @param {Object} data - Send data.
+     * @return {Promise<Invoice>} A promise for the send result.
+     *
+     * @See https://developers.coinbase.com/api/v2#send-money
+     *
+     * data = {
+     *   to: [required] <address|email>,
+     *   amount: [required] <number>,
+     *   currency: [required] <string>,
+     *   description: <string>
+     * }
+     */
+    this.send = function(data) {
+      var request = {
+        method: 'POST',
+        url: apiRoot + '/accounts/' + this.id + '/transactions',
+        data: data,
+        opts: {
+          cancelOn: [401]
+        }
+      };
+
+      return new ApiMessage(request).send().then(function(response) {
+        return response.data;
+
+      }).catch(function(error) {
+        throw new ApiError(error);
+        
+      });
+    };
+
     this.getTransaction = function(txId) {
       var request = {
         method: 'GET',
