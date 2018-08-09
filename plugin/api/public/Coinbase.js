@@ -22,9 +22,9 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
     var apiRoot = servlet.apiRoot();
     var config = servlet.getConfig(configId);
 
-    this.accounts;
-    this.paymentMethods;
-    this.urls;
+    this.accounts = [];
+    this.paymentMethods = [];
+    this.urls = {};
 
     // The collection of currencies offered by Coinbase as 'products'.
     this.currencies = [{
@@ -98,7 +98,7 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
 
     this.getAccountByCurrencyCode = function(currencyCode) {
       return lodash.find(this.accounts, function(a) {
-        return a.currency.code == currencyCode;
+        return a.currency.code == currencyCode.toUpperCase();
       });
     };
 
@@ -140,7 +140,6 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
       };
 
       return new ApiMessage(request).send().then(function(response) {
-
         if (response.data) {
           var accountObjs = response.data;
           self.accounts = [];
@@ -154,6 +153,8 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
             return a.sort;
           });
         }
+
+        return self.accounts;
 
       }).catch(function(error) {
         throw new ApiError(error);
@@ -378,11 +379,11 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
       };
 
       return new ApiMessage(request).send().then(function(response) {
-        self.urls = lodash.get(response, 'data.info.urls', []);
+        self.urls = lodash.get(response, 'data.info.urls', {});
 
         if (response.data.authenticated == true) {
 
-          self.getAccounts().then(function() {
+          self.getAccounts().then(function(accounts) {
             onCoinbaseLogin();
 
           }).catch(function(error) {
