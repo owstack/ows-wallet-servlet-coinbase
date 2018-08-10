@@ -153,8 +153,11 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
         $log.info('Logged out of Coinbase.');
 
         // Logged out. Broadcast a logout event to interested plugins.
-        session.broadcastEvent('coinbase.logout', {
-          reason: reason || 'USER_REQUESTED'
+        session.broadcastEvent({
+          name: 'coinbase.logout',
+          data: {
+            reason: reason || 'USER_REQUESTED'
+          }
         });
 
         resolve();
