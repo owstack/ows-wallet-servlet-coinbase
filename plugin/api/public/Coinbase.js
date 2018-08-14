@@ -98,7 +98,7 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
 
     this.getAccountByCurrencyCode = function(currencyCode) {
       return lodash.find(this.accounts, function(a) {
-        return a.currency.code == currencyCode.toUpperCase();
+        return a.currency.code == currencyCode;
       });
     };
 
@@ -205,32 +205,6 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
         throw new ApiError(error);
         
       });
-    };
-
-    this.getPriceSensitivity = function() {
-      var priceSensitivity = [{
-        value: 0.5,
-        name: '0.5%'
-      }, {
-        value: 1,
-        name: '1%'
-      }, {
-        value: 2,
-        name: '2%'
-      }, {
-        value: 5,
-        name: '5%'
-      }, {
-        value: 10,
-        name: '10%'
-      }];
-
-      var selectedPriceSensitivity = priceSensitivity[1];
-
-      return {
-        values: priceSensitivity,
-        selected: selectedPriceSensitivity
-      };
     };
 
     this.buyPrice = function(currency) {

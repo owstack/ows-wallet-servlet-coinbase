@@ -20,54 +20,28 @@ angular.module('owsWalletPlugin.apiHandlers').service('getTransactions', functio
       return callback(message);
     };
 
-    if (!transactionId) {
-      // Get a collection of transactions.
-      coinbaseService.getTransactions(accountId).then(function(response) {
+    // transactionId is optional. If no transactionId is specified then all transactions are returned.
+    coinbaseService.getTransactions(accountId, transactionId).then(function(response) {
 
-        message.response = {
-          statusCode: 200,
-          statusText: 'OK',
-          data: response
-        };
-        return callback(message);
+      message.response = {
+        statusCode: 200,
+        statusText: 'OK',
+        data: response
+      };
+      return callback(message);
 
-      }).catch(function(error) {
+    }).catch(function(error) {
 
-        message.response = {
-          statusCode: error.statusCode || 500,
-          statusText: error.statusText || 'UNEXPECTED_ERROR',
-          data: {
-            message: error.message
-          }
-        };
-        return callback(message);
+      message.response = {
+        statusCode: error.statusCode || 500,
+        statusText: error.statusText || 'UNEXPECTED_ERROR',
+        data: {
+          message: error.message
+        }
+      };
+      return callback(message);
 
-      });
-
-    } else {
-      // Get a single transaction.
-      coinbaseService.getTransaction(accountId, transactionId).then(function(response) {
-
-        message.response = {
-          statusCode: 200,
-          statusText: 'OK',
-          data: response
-        };
-        return callback(message);
-
-      }).catch(function(error) {
-
-        message.response = {
-          statusCode: error.statusCode || 500,
-          statusText: error.statusText || 'UNEXPECTED_ERROR',
-          data: {
-            message: error.message
-          }
-        };
-        return callback(message);
-
-      });
-    }
+    });
 	};
 
   return root;

@@ -131,7 +131,8 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Account', function (loda
      * data = {
      *   amount: [required] <number>,
      *   currency: [required] <string>,
-     *   paymentMethodId: <string>
+     *   paymentMethodId: <string>,
+     *   walletId: <string> [optional] - if specified then the wallet will be used as the destination for the transaction.
      * }
      */
     this.createBuyOrder = function(data) {
@@ -185,7 +186,11 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Account', function (loda
      * data = {
      *   amount: [required] <number>,
      *   currency: [required] <string>,
-     *   paymentMethodId: <string>
+     *   paymentMethodId: <string>,
+     *   walletId: <string> [optional] - if specified then the wallet will be used as the source for the transaction with the
+     *   intent of auto-committing the transaction at the appropriate time (see priceStopLimitAmount).
+     *   priceStopLimitAmount: <number> [optional] - if specified then the sell order will be committed only if the market price
+     *   is greater than or equal to priceStopLimitAmount.
      * }
      */
     this.createSellOrder = function(data) {

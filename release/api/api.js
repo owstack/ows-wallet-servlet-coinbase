@@ -138,7 +138,8 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Account', ['lodash', 'Ap
      * data = {
      *   amount: [required] <number>,
      *   currency: [required] <string>,
-     *   paymentMethodId: <string>
+     *   paymentMethodId: <string>,
+     *   walletId: <string> [optional] - if specified then the wallet will be used as the destination for the transaction.
      * }
      */
     this.createBuyOrder = function(data) {
@@ -192,7 +193,11 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Account', ['lodash', 'Ap
      * data = {
      *   amount: [required] <number>,
      *   currency: [required] <string>,
-     *   paymentMethodId: <string>
+     *   paymentMethodId: <string>,
+     *   walletId: <string> [optional] - if specified then the wallet will be used as the source for the transaction with the
+     *   intent of auto-committing the transaction at the appropriate time (see priceStopLimitAmount).
+     *   priceStopLimitAmount: <number> [optional] - if specified then the sell order will be committed only if the market price
+     *   is greater than or equal to priceStopLimitAmount.
      * }
      */
     this.createSellOrder = function(data) {
@@ -459,7 +464,7 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', ['$log', 'lod
 
     this.getAccountByCurrencyCode = function(currencyCode) {
       return lodash.find(this.accounts, function(a) {
-        return a.currency.code == currencyCode.toUpperCase();
+        return a.currency.code == currencyCode;
       });
     };
 
@@ -566,32 +571,6 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', ['$log', 'lod
         throw new ApiError(error);
         
       });
-    };
-
-    this.getPriceSensitivity = function() {
-      var priceSensitivity = [{
-        value: 0.5,
-        name: '0.5%'
-      }, {
-        value: 1,
-        name: '1%'
-      }, {
-        value: 2,
-        name: '2%'
-      }, {
-        value: 5,
-        name: '5%'
-      }, {
-        value: 10,
-        name: '10%'
-      }];
-
-      var selectedPriceSensitivity = priceSensitivity[1];
-
-      return {
-        values: priceSensitivity,
-        selected: selectedPriceSensitivity
-      };
     };
 
     this.buyPrice = function(currency) {
@@ -771,7 +750,7 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', ['$log', 'lod
 
 'use strict';
 
-angular.module('owsWalletPlugin.api.coinbase').factory('Order', ['ApiMessage', 'owsWalletPluginClient.api.ApiError', 'owsWalletPlugin.api.coinbase.CoinbaseServlet', 'owsWalletPlugin.api.coinbase.PaymentMethod', 'owsWalletPluginClient.api.PluginApiHelper', 'owsWalletPluginClient.api.Utils', function (ApiMessage,
+angular.module('owsWalletPlugin.api.coinbase').factory('Order', ['lodash', 'ApiMessage', 'owsWalletPluginClient.api.ApiError', 'owsWalletPlugin.api.coinbase.CoinbaseServlet', 'owsWalletPlugin.api.coinbase.PaymentMethod', 'owsWalletPluginClient.api.PluginApiHelper', 'owsWalletPluginClient.api.Utils', function (lodash, ApiMessage,
   /* @namespace owsWalletPluginClient.api */ ApiError,
   /* @namespace owsWalletPlugin.api.coinbase */ CoinbaseServlet,
   /* @namespace owsWalletPlugin.api.coinbase */ PaymentMethod,
@@ -784,7 +763,7 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Order', ['ApiMessage', '
    * @param {string} account -The Account object.
    * @constructor
    *
-   * Sample Coinbase order data response.
+   * Sample order data response.
    * {
    *   id: 'b68f4ac0-882e-5ed6-9d58-231e2f83595f',
    *   status: 'invalid',
@@ -825,7 +804,8 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Order', ['ApiMessage', '
    *   hold_until: null,
    *   hold_days: 0,
    *   requires_completion_step: false,
-   *   is_first_buy: false
+   *   is_first_buy: false,
+   *   walletId: '4c50501f-6370-4f30-bbc7-d6f84b64e174'
    * }
    */
   var propertyMap = {
@@ -846,12 +826,32 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Order', ['ApiMessage', '
     'total.currency': 'total.currency',
     'subtotal.amount': 'subtotal.amount',
     'subtotal.currency': 'subtotal.currency',
-    'is_first_buy': 'isFirstBuy'
+    'is_first_buy': 'isFirstBuy',
+    'walletId': 'walletId'
   };
+
+  // For orders that may be delyed, the price sensivity is set by the user at order placement and consulted before
+  // filling at the time of fulfillment.
+  var priceSensitivity = [{
+    value: 0.005,
+    label: '0.5%'
+  }, {
+    value: 0.01,
+    label: '1%',
+    default: true
+  }, {
+    value: 0.02,
+    label: '2%'
+  }, {
+    value: 0.05,
+    label: '5%'
+  }, {
+    value: 0.10,
+    label: '10%'
+  }];
 
   function Order(orderData, accountObj) {
     var self = this;
-    var orderData = orderData;
     Utils.assign(this, orderData, propertyMap);
 
     this.account = accountObj;
@@ -862,12 +862,26 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Order', ['ApiMessage', '
       currency: this.total.currency
     };
 
+    // Set the default price stop limit amount.
+    //
+    // For sell orders - if the price falls below this value at the time the commit order is to be placed then the sale
+    // will be halted.
+    this.priceStopLimitAmount = this.amount.amount - (this.amount.amount * defaultPriceSensitivity().value);
+
     var servlet = new PluginApiHelper(CoinbaseServlet);
     var apiRoot = servlet.apiRoot();
 
     /**
      * Public functions
      */
+
+    this.priceSensitivityOptions = function() {
+      return priceSensitivity;
+    };
+
+    this.setPriceSensitivity = function(percentage) {
+      this.priceStopLimitAmount = this.amount.amount - (this.amount.amount * percentage);
+    };
 
     this.getPaymentMethod = function() {
       var request = {
@@ -888,24 +902,30 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Order', ['ApiMessage', '
     }
 
     /**
-     * Confirm this order; either a buy or sell.
-     * @return {Promise<Invoice>} A promise for the confirmed order.
+     * Commit this order; either a buy or sell.
+     * @return {Promise<Invoice>} A promise for the committed order.
      *
      * @See https://developers.coinbase.com/api/v2#place-buy-order
+     *
+     * If monitorData is specified in the data payload then this order will be monitored and the wallet used as
+     * the source (sell) or destination (buy) for the transaction.
      */
-    this.confirm = function() {
+    this.commit = function() {
       var request = {
         method: 'POST',
         url: apiRoot + '/accounts/' + this.account.id + '/' + self.kind + 's/' + self.id + '/commit',
-        data: {},
+        data: {
+          walletId: this.walletId,
+          amount: this.amount.amount,
+          priceStopLimitAmount: this.priceStopLimitAmount
+        },
         opts: {
           cancelOn: [401]
         }
       };
 
       return new ApiMessage(request).send().then(function(response) {
-        orderData = response.data.data;
-        Utils.assign(self, orderData, propertyMap);
+        Utils.assign(self, response.data.data, propertyMap);
         return self;
 
       }).catch(function(error) {
@@ -913,6 +933,17 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Order', ['ApiMessage', '
         
       });
     };
+
+    /**
+     * Private functions
+     */
+
+     function defaultPriceSensitivity() {
+      return lodash.find(priceSensitivity, function(s) {
+        return s.default;
+      });
+    };
+
 
     return this;
   };

@@ -5,7 +5,8 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
   /* @namespace owsWalletPluginClient.api */ Http,
   /* @namespace owsWalletPluginClient.api */ Session,
   /* @namespace owsWalletPluginClient.api */ Settings,
-  /* @namespace owsWalletPluginClient.api */ Storage) {
+  /* @namespace owsWalletPluginClient.api */ Storage,
+  /* @namespace owsWalletPluginClient.api */ Transaction) {
 
   var root = {};
 
@@ -57,15 +58,6 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
     statusText: 'UNAUTHORIZED_GRANT'
   }];
 
-  // When a new block is seen we update our pending transactions.
-  owswallet.Plugin.onEvent('host.new-block', function(event) {
-    var network = lodash.get(event, 'event.n.data.network');
-
-    if (event.type == 'NewBlock' && network.indexOf('livenet') >= 0)  {
-      fetchPendingTransactions();
-    }
-  });
-
   // Invoked via the servlet API to initialize our environment using the provided configuration (typically from applet plugin configuration).
   root.init = function(clientId, config, oauthCode) {
     return new Promise(function(resolve, reject) {
@@ -107,7 +99,7 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
             return val1.coinbaseId == val2.id;
           });
 
-          if (oauthError) {
+          if (oauthError.length > 0) {
             // There should only be one error in the array.
             oauthError = oauthError[0];
 
@@ -169,10 +161,6 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
     });
   };
 
-  root.getStorage = function() {
-    return storage;
-  };
-
   root.getExchangeRates = function(currency) {
     return new Promise(function(resolve, reject) {
       coinbaseApi.get('exchange-rates?currency=' + currency).then(function(response) {
@@ -229,13 +217,13 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
     });
   };
 
-  root.getTransaction = function(accountId, transactionId) {
+  root.getTransactions = function(accountId, transactionId) {
     return new Promise(function(resolve, reject) {
       coinbaseApi.get('accounts/' + accountId + '/transactions/' + transactionId).then(function(response) {
         var data = response.data.data;
         resolve(data);
       }).catch(function(response) {
-        reject(getError(response, 'getTransaction'));
+        reject(getError(response, 'getTransactions'));
       });
     });
   };
@@ -250,18 +238,7 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       });
     });
   };
-*/
-  root.getTransactions = function(accountId) {
-    return new Promise(function(resolve, reject) {
-      coinbaseApi.get('accounts/' + accountId + '/transactions').then(function(response) {
-        var data = response.data.data;
-        resolve(data);
-      }).catch(function(response) {
-        reject(getError(response, 'getTransactions'));
-      });
-    });
-  };
-/*
+
   root.paginationTransactions = function(url) {
     return new Promise(function(resolve, reject) {
       coinbaseApi.get(url.replace('/v2', '')).then(function(response) {
@@ -360,30 +337,56 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       });
     });
   };
-/*
-  root.getPaymentMethod = function(paymentMethodId) {
+
+  root.createAddress = function(accountId, addressData) {
     return new Promise(function(resolve, reject) {
-      coinbaseApi.get('payment-methods/' + paymentMethodId).then(function(response) {
-        var data = response.data;
+      var data = {
+        name: addressData.name
+      };
+
+      coinbaseApi.post('accounts/' + accountId + '/addresses', data).then(function(response) {
+        var data = response.data.data;
         resolve(data);
       }).catch(function(response) {
-        reject(getError(response, 'getPaymentMethod'));
+        reject(getError(response, 'createAddress'));
       });
     });
   };
-*/
+
+  root.getTime = function() {
+    return new Promise(function(resolve, reject) {
+      coinbaseApi.get('time/').then(function(response) {
+        var data = response.data.data;
+        resolve(data);
+      }).catch(function(response) {
+        reject(getError(response, 'getTime'));
+      });
+    });
+  };
+
   root.sellRequest = function(accountId, requestData) {
     return new Promise(function(resolve, reject) {
+      // If a walletId is specified then the sell request starts from an OWS wallet, not a Coinbase account.
+      // Ensure the order does not commit.
+      if (requestData.walletId) {
+        requestData.commit = false;
+        requestData.quote = false;
+      }
+
       var data = {
         amount: requestData.amount,
         currency: requestData.currency,
-        payment_method: requestData.payment_method ||  null,
+        payment_method: requestData.paymentMethodId ||  null,
         commit: requestData.commit || false,
         quote: requestData.quote || false
       };
 
       coinbaseApi.post('accounts/' + accountId + '/sells', data).then(function(response) {
         var data = response.data.data;
+
+        // Pass back the walletId (if specified).
+        data.walletId = requestData.walletId;
+
         resolve(data);
       }).catch(function(response) {
         reject(getError(response, 'sellRequest'));
@@ -402,6 +405,40 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
     });
   };
 
+  root.sellCommitFromWallet = function(accountId, walletId, amount, monitorData) {
+    return new Promise(function(resolve, reject) {
+      // Get the destination address from the Coinbase account.
+      root.createAddress(accountId, {
+        name: 'Funds to sell from wallet'
+      }).then(function(address) {
+
+        // Create a wallet transaction to send to coinbase account.
+        var walletTx = new Transaction({
+          walletId: walletId,
+          urlOrAddress: address,
+          amount: amount
+        });
+
+        // Broadcast a blockchain transaction.
+        return walletTx.send();
+
+      }).then(function(tx) {
+
+        monitorService.addMonitor({
+          accountId: accountId,
+          walletId: walletId,
+          txHash: tx.id,
+          priceStopLimitAmount: monitorData.priceStopLimitAmount,
+          pluginId: monitorData.pluginId,
+          action: 'sell'
+        });
+
+      }).catch(function() {
+        reject(getError(error, 'sellCommit'));
+      });
+    });
+  };
+
   root.buyRequest = function(accountId, requestData) {
     return new Promise(function(resolve, reject) {
       var data = {
@@ -411,9 +448,11 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
         commit: requestData.commit || false,
         quote: requestData.quote || false
       };
-
+      
       coinbaseApi.post('accounts/' + accountId + '/buys', data).then(function(response) {
         var data = response.data.data;
+        // Pass the walletId (if specified) back to the caller.
+        data.walletId = requestData.walletId;
         resolve(data);
       }).catch(function(response) {
         reject(getError(response, 'buyRequest'));
@@ -432,17 +471,23 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
     });
   };
 
-  root.createAddress = function(accountId, addressData) {
+  root.buyCommitFromWallet = function(accountId, walletId, buyId, monitorData) {
     return new Promise(function(resolve, reject) {
-      var data = {
-        name: addressData.name
-      };
+      coinbaseApi.post('accounts/' + accountId + '/buys/' + buyId + '/commit').then(function(response) {
+        var data = response.data;
 
-      coinbaseApi.post('accounts/' + accountId + '/addresses', data).then(function(response) {
-        var data = response.data.data;
+        monitorService.addMonitor({
+          accountId: accountId,
+          walletId: walletId,
+          txId: data.id,
+          priceStopLimitAmount: monitorData.priceStopLimitAmount,
+          pluginId: monitorData.pluginId,
+          action: 'buy'
+        });
+
         resolve(data);
       }).catch(function(response) {
-        reject(getError(response, 'createAddress'));
+        reject(getError(response, 'buyCommit'));
       });
     });
   };
@@ -466,139 +511,36 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
     });
   };
 
-  root.getAccountTransactions = function(accountId) {
-    return new Promise(function(resolve, reject) {
-      coinbaseApi.get('accounts/' + accountId + '/transactions').then(function(response) {
-        var data = response.data.data;
-        resolve(data);
-      }).catch(function(response) {
-        reject(getError(response, 'getAccountTransactions'));
+  root.sendToWallet = function(accountId, walletId, note) {
+    var wallet;
+    var address;
+
+    return session.getWalletById(walletId).then(function(w) {
+      wallet = w;
+      return wallet.getAddress();
+
+    }).then(function(a) {
+      address = a;
+      return wallet.getFeeRate();
+
+    }).then(function(feePerKb) {
+
+      // Estimate transction size of 450 bytes to compute total fee.
+      var fee = feePerKb.standard * (450 / 1000);
+      var netAmount = amount - fee;
+
+      return coinbaseService.sendTo(accountId, {
+        to: address,
+        amount: netAmount,
+        currency: wallet.currency,
+        description: note
       });
-    });
-  };
 
-  root.getPendingTransactions = function(pendingTransactions) {
-    return new Promise(function(resolve, reject) {
-      storage.getTxs().then(function(txs) {
-        txs = txs ? JSON.parse(txs) : {};
-        pendingTransactions.data = lodash.isEmpty(txs) ? null : txs;
-
-        lodash.forEach(pendingTransactions.data, function(dataFromStorage, txId) {
-          if ((dataFromStorage.type == 'sell' && dataFromStorage.status == 'completed') ||
-            (dataFromStorage.type == 'buy' && dataFromStorage.status == 'completed') ||
-            dataFromStorage.status == 'error' ||
-            (dataFromStorage.type == 'send' && dataFromStorage.status == 'completed')) {
-
-            return;
-          }
-
-          root.getTransaction(accountId, txId, function(err, tx) {
-            if (err || lodash.isEmpty(tx) || (tx.data && tx.data.error)) {
-              root.savePendingTransaction(dataFromStorage, {
-                status: 'error',
-                error: (tx.data && tx.data.error) ? tx.data.error : err
-              }, function(err) {
-                if (err) {
-                  $log.debug(err);
-                }
-                refreshTransactions(pendingTransactions);
-              });
-              return;
-            }
-
-            updatePendingTransactions(dataFromStorage, tx.data);
-            pendingTransactions.data[txId] = dataFromStorage;
-
-            if (tx.data.type == 'send' && tx.data.status == 'completed' && tx.data.from) {
-
-              root.sellPrice(dataFromStorage.sell_price_currency).then(function(s) {
-                var newSellPrice = s.data.amount;
-                var variance = Math.abs((newSellPrice - dataFromStorage.sell_price_amount) / dataFromStorage.sell_price_amount * 100);
-
-                if (variance < dataFromStorage.price_sensitivity.value) {
-                  sellPending(dataFromStorage, accountId, pendingTransactions, function(pendingTransactions) {
-                    return;
-                  });
-
-                } else {
-                  root.savePendingTransaction(dataFromStorage, {
-                    status: 'error',
-                    error: {errors: [{message: 'Price falls over the selected percentage'}]}
-                  }, function(err) {
-                    if (err) {
-                      $log.debug(err);
-                    }
-                    refreshTransactions(pendingTransactions);
-                    return;
-                  });
-
-                }
-
-              }).catch(function(error) {
-                root.savePendingTransaction(dataFromStorage, {
-                  status: 'error',
-                  error: error
-                }, function(err) {
-                  if (err) {
-                    $log.debug(err);
-                  }
-                  refreshTransactions(pendingTransactions);
-                  return;
-                });
-
-              });
-
-            } else if (tx.data.type == 'buy' && tx.data.status == 'completed' && tx.data.buy) {
-              if (dataFromStorage) {
-                sendToWallet(dataFromStorage, accountId, pendingTransactions);
-              }
-              return;
-
-            } else {
-              root.savePendingTransaction(dataFromStorage, {}, function(err) {
-                if (err) {
-                  $log.debug(err);
-                }
-                refreshTransactions(pendingTransactions);
-                return;
-              });
-
-            }
-
-          });
-        });
-
-        return resolve(pendingTransactions);
-
-      });
-    });
-  };
-
-  root.savePendingTransaction = function(ctx, opts, cb) {
-    storage.getTxs().then(function(oldTxs) {
-      if (lodash.isString(oldTxs)) {
-        oldTxs = JSON.parse(oldTxs);
-      }
-      if (lodash.isString(ctx)) {
-        ctx = JSON.parse(ctx);
-      }
-
-      var tx = oldTxs || {};
-      tx[ctx.id] = ctx;
-
-      if (opts && (opts.error || opts.status)) {
-        tx[ctx.id] = lodash.assign(tx[ctx.id], opts);
-      }
-      if (opts && opts.remove) {
-        delete(tx[ctx.id]);
-      }
-
-      tx = JSON.stringify(tx);
-
-      return storage.setTxs(tx);
+    }).then(function(tx) {
+      return tx;
 
     }).catch(function(error) {
-      return cb(error);
+      throw error;
 
     });
   };
@@ -856,181 +798,6 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
     };
   };
 
-  function updatePendingTransactions(obj /*, ...*/ ) {
-    for (var i = 1; i < arguments.length; i++) {
-      for (var prop in arguments[i]) {
-        var val = arguments[i][prop];
-        if (typeof val == "object") {
-          updatePendingTransactions(obj[prop], val);
-        } else {
-          obj[prop] = val ? val : obj[prop];
-        }
-      }
-    }
-    return obj;
-  };
-
-  function fetchPendingTransactions() {
-    return lodash.throttle(function() {
-      $log.debug('Updating coinbase pending transactions...');
-      var pendingTransactions = {
-        data: {}
-      };
-      root.getPendingTransactions(pendingTransactions);
-    }, 20000);
-  };
-
-  function refreshTransactions(pendingTransactions) {
-    storage.getTxs().then(function(txs) {
-      txs = txs ? JSON.parse(txs) : {};
-      pendingTransactions.data = lodash.isEmpty(txs) ? null : txs;
-    }).catch(function(error) {
-      $log.error(error);
-    });
-  };
-
-  function sellPending(tx, accountId, pendingTransactions, cb) {
-    var data = tx.amount;
-    data['payment_method'] = tx.payment_method || null;
-    data['commit'] = true;
-
-    root.sellRequest(accountId, data).then(function(res) {
-      if (res.data && !res.data.transaction) {
-        root.savePendingTransaction(tx, {
-          status: 'error',
-          error: {errors: [{message: 'Sell order: transaction not found.'}]}
-        }, function(err) {
-          if (err) {
-            $log.debug(err);
-          }
-          refreshTransactions(pendingTransactions);
-          cb(pendingTransactions);
-        });
-
-      } else {
-
-        root.getTransaction(accountId, res.data.transaction.id).then(function(updatedTx) {
-          root.savePendingTransaction(tx, {
-            remove: true
-          }, function(err) {
-            root.savePendingTransaction(updatedTx.data, {}, function(err) {
-              if (err) {
-                $log.debug(err);
-              }
-              refreshTransactions(pendingTransactions);
-              cb(pendingTransactions);
-            });
-          });
-
-        }).catch(function(error) {
-          root.savePendingTransaction(tx, {
-            status: 'error',
-            error: error
-          }, function(error) {
-            if (error) {
-              $log.error(error);
-            }
-            refreshTransactions(pendingTransactions);
-            cb(pendingTransactions);
-          });
-
-        });
-      }
-
-    }).catch(function(error) {
-      root.savePendingTransaction(tx, {
-        status: 'error',
-        error: error
-      }, function(error) {
-        if (error) {
-          $log.debug(error);
-        }
-        refreshTransactions(pendingTransactions);
-        cb(pendingTransactions);
-      });
-
-    });
-  };
-
-  function sendToWallet(tx, accountId, pendingTransactions) {
-    var desc = Host.nameCase + ' Wallet';
-
-    getNetAmount(tx.amount.amount, function(err, amountBTC, feeBTC) {
-      if (err) {
-        root.savePendingTransaction(tx, {
-          status: 'error',
-          error: {errors: [{message: err}]}
-        }, function(err) {
-          if (err) $log.debug(err);
-          refreshTransactions(pendingTransactions);
-        });
-        return;
-      }
-
-      var data = {
-        to: tx.toAddr,
-        amount: amountBTC,
-        currency: tx.amount.currency,
-        description: desc,
-        fee: feeBTC
-      };
-
-      root.sendTo(accountId, data).then(function(res) {
-        if (res.data && !res.data.id) {
-          root.savePendingTransaction(tx, {
-            status: 'error',
-            error: {errors: [{message: 'Transactions not found in Coinbase.com'}]}
-          }, function(err) {
-            if (err) {
-              $log.debug(err);
-            }
-            refreshTransactions(pendingTransactions);
-          });
-          return;
-        }
-
-        root.getTransaction(accountId, res.data.id).then(function(sendTx) {
-          root.savePendingTransaction(tx, {
-            remove: true
-          }, function(err) {
-            if (err) {
-              $log.error(err);
-            }
-            root.savePendingTransaction(sendTx.data, {}, function(err) {
-              if (err) {
-                $log.debug(err);
-              }
-              refreshTransactions(pendingTransactions);
-            });
-          });
-        });
-
-      }).catch(function(error) {
-        root.savePendingTransaction(tx, {
-          status: 'error',
-          error: error
-        }, function(error) {
-          if (error) $log.debug(error);
-          refreshTransactions(pendingTransactions);
-        });
-
-      });
-    });
-  };
-
-  function getNetAmount(amount, cb) {
-    // Fee Normal for a single transaction (450 bytes)
-    var txNormalFeeKB = 450 / 1000;
-    feeService.getFeeRate('btc', 'livenet', 'normal', function(err, feePerKb) {
-      if (err) {
-        return cb('Could not get fee rate');
-      }
-      var feeBTC = (feePerKb * txNormalFeeKB / 100000000).toFixed(8);
-
-      return cb(null, amount - feeBTC, feeBTC);
-    });
-  };
-
   function getError(response, callerId) {
     // Check for JS error.
     if (response.message) {
@@ -1046,7 +813,7 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
     if (response.status && response.status <= 0) {
       error = {
         id: 'network_error',
-        message: 'Network connection error'
+        message: 'Network error'
       };
 
     } else {
@@ -1066,14 +833,17 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
 
       } else {
         // A simple text string.
+        if (typeof response == 'object') {
+          response = JSON.stringify(response);
+        }
         error = {
           id: 'unexpected_error',
           message: response.toString()
         };
       }
-
-      return error;
     }
+
+    return error;
   };
 
   function getErrorsAsString(data) {
