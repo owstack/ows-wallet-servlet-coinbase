@@ -219,7 +219,7 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
 
   root.getTransactions = function(accountId, transactionId) {
     return new Promise(function(resolve, reject) {
-      coinbaseApi.get('accounts/' + accountId + '/transactions/' + transactionId).then(function(response) {
+      coinbaseApi.get('accounts/' + accountId + '/transactions/' + (transactionId ? transactionId : '')).then(function(response) {
         var data = response.data.data;
         resolve(data);
       }).catch(function(response) {
