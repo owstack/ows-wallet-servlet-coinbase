@@ -297,39 +297,22 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', function ($lo
       });
     };
 
-    this.getPendingTransactions = function() {
+    this.getPendingTransactions = function(walletId) {
       var request = {
         method: 'GET',
-        url: apiRoot + '/transactions/pending',
+        url: apiRoot + '/wallet/' + walletId + '/transactions/pending',
         opts: {
           cancelOn: [401]
         }
       };
 
       return new ApiMessage(request).send().then(function(response) {
-        return response.data;
+        var transactions = [];
 
-      }).catch(function(error) {
-        throw new ApiError(error);
-        
-      });
-    };
-
-    this.savePendingTransaction = function(tx, options) {
-      var request = {
-        method: 'POST',
-        url: apiRoot + '/account/transactions',
-        data: {
-          tx: tx,
-          options: options
-        },
-        opts: {
-          cancelOn: [401]
-        }
-      };
-
-      return new ApiMessage(request).send().then(function(response) {
-        return response.data;
+        lodash.forEach(response.data, function(txData) {
+          transactions.push(new Transaction(txData));
+        });
+        return transactions;
 
       }).catch(function(error) {
         throw new ApiError(error);

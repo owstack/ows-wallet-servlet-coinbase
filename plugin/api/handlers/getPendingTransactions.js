@@ -1,17 +1,14 @@
 'use strict';
 
-angular.module('owsWalletPlugin.apiHandlers').service('getPendingTransactions', function(coinbaseService) {
+angular.module('owsWalletPlugin.apiHandlers').service('getPendingTransactions', function(monitorDataService) {
 
 	var root = {};
 
   root.respond = function(message, callback) {
+    // Request parameters.
+    var walletId = message.request.params.walletId;
 
-    // Get a collection of pending transactions.
-    var pendingTransactions = {
-      data: {}
-    };
-
-    coinbaseService.getPendingTransactions(pendingTransactions).then(function(pendingTransactions) {
+    monitorDataService.getPendingTransactions(walletId).then(function(pendingTransactions) {
 
       message.response = {
         statusCode: 200,

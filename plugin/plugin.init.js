@@ -23,10 +23,9 @@ angular.module('owsWalletPlugin').config(function($pluginConfigProvider) {
     { path: '/prices/sell/:currency',                     method: 'GET',  handler: 'getSellPrice' },
     { path: '/prices/spot',                               method: 'GET',  handler: 'getSpotPrice' },
     { path: '/service',                                   method: 'PUT',  handler: 'service' },
-    { path: '/transactions/pending',                      method: 'GET',  handler: 'getPendingTransactions' },
-    { path: '/transactions/pending',                      method: 'POST', handler: 'savePendingTransactions' },
     { path: '/urls',                                      method: 'GET',  handler: 'getUrls' },
-    { path: '/user',                                      method: 'GET',  handler: 'getCurrentUser' }
+    { path: '/user',                                      method: 'GET',  handler: 'getCurrentUser' },
+    { path: '/wallet/:id/transactions/pending',           method: 'GET',  handler: 'getPendingTransactions' }
   ]);
 
 })

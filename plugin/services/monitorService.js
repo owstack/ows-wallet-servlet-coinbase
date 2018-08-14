@@ -51,7 +51,9 @@ angular.module('owsWalletPlugin.services').factory('monitorService', function($r
 
   init();
 
-  // data = {
+  // monitor = {
+  //
+  //   // User specified
   //   accountId: <string> - Coinbase account id for subject transaction
   //   walletId: <string> - OWS wallet id for subject transaction
   //   txId: <string> - Coinbase subject transaction; n/a when creating sell monitor
@@ -59,23 +61,36 @@ angular.module('owsWalletPlugin.services').factory('monitorService', function($r
   //   priceStopLimitAmount: <number> - The price below which the order will be halted; applies only to sell orders
   //   pluginId: <string> - The plugin id of the transaction requestor
   //   action: <string> - Either 'buy or 'sell'
+  //
+  //   // Internal
+  //   status: <string> - 'failed', 'expired', 'canceled', 'complete'
+  //   stage: <number> - 1 or 2
+  //   created: <date>
+  //   updated: <date>
+  //   log [{ // Data copied from the body of the monitor
+  //     txHash: 
+  //     txId: 
+  //     status: 
+  //     stage: 
+  //     timestamp: 
+  //   }]
   // }
-  root.addMonitor = function(data) {
+  root.addMonitor = function(monitor) {
     // Add a new transaction to monitor.
     var mtxs = storage.getMonitor();
 
-    if (!data.created) {
+    if (!monitor.created) {
       // Create new monitor.
-      data.status = 'pending';
-      data.stage = 1;
-      data.created = timestamp();
-      data.log = [];
-      mtxs.push(data);
+      monitor.status = 'pending';
+      monitor.stage = 1;
+      monitor.created = timestamp();
+      monitor.log = [];
+      mtxs.push(monitor);
 
     } else {
       // Update existing monitor.
-      data.stage += data.stage;
-      data.updated = timestamp();
+      monitor.stage += monitor.stage;
+      monitor.updated = timestamp();
 
     }
 
@@ -84,6 +99,11 @@ angular.module('owsWalletPlugin.services').factory('monitorService', function($r
     $rootScope.$emit('Local/MonitorActive', true);
 
     monitorNow();
+  };
+
+  root.getMonitors = function() {
+    // Return an array of monitors.
+    return storage.getMonitor();    
   };
 
   /**
@@ -135,8 +155,7 @@ angular.module('owsWalletPlugin.services').factory('monitorService', function($r
                     txId: mtx.txId,
                     status: 'complete',
                     stage: mtx.stage,
-                    action: mtx.action,
-                    date: timestamp()
+                    timestamp: timestamp()
                   });
                   delete mtx.txId;
 
@@ -165,8 +184,7 @@ angular.module('owsWalletPlugin.services').factory('monitorService', function($r
                   txId: mtx.txId,
                   status: 'complete',
                   stage: mtx.stage,
-                  action: mtx.action,
-                  date: timestamp()
+                  timestamp: timestamp()
                 });
                 delete mtx.txId;
 
@@ -185,7 +203,6 @@ angular.module('owsWalletPlugin.services').factory('monitorService', function($r
                 txId: mtx.txId,
                 status: 'complete',
                 stage: mtx.stage,
-                action: mtx.action,
                 date: timestamp()
               });
               delete mtx.txId;
@@ -202,8 +219,7 @@ angular.module('owsWalletPlugin.services').factory('monitorService', function($r
             txId: mtx.txId,
             status: statusMap[tx.status],
             stage: mtx.stage,
-            action: mtx.action,
-            date: timestamp()
+            timestamp: timestamp()
           });
           delete mtx.txId;
 
@@ -251,8 +267,7 @@ angular.module('owsWalletPlugin.services').factory('monitorService', function($r
               txHash: mtx.txHash,
               status: 'complete',
               stage: mtx.stage,
-              action: mtx.action,
-              date: timestamp()
+              timestamp: timestamp()
             });
             delete mtx.txHash;
 
@@ -276,8 +291,7 @@ angular.module('owsWalletPlugin.services').factory('monitorService', function($r
             txId: mtx.txHash,
             status: statusMap[cbTx.status],
             stage: mtx.stage,
-            action: mtx.action,
-            date: timestamp()
+            timestamp: timestamp()
           });
           delete mtx.txHash;
 

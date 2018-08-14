@@ -20,7 +20,7 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Transaction', function (
    *     amount: '-1.04996200',
    *     currency: 'BTC'
    *   },
-   *   native_amount': {
+   *   native_amount: {
    *     amount: '-15828.17',
    *     currency: 'USD'
    *   },
