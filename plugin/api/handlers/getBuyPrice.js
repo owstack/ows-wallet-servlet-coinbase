@@ -1,23 +1,29 @@
 'use strict';
 
-angular.module('owsWalletPlugin.apiHandlers').service('getBuyPrice', function(coinbaseService) {
+angular.module('owsWalletPlugin.apiHandlers').service('getBuyPrice', function(coinbaseService,
+  /* @namespace owsWalletPluginClient.api */ Utils) {
 
-	var root = {};
+  var root = {};
+
+  var REQUIRED_PARAMS = [
+    'currency'
+  ];
 
   root.respond = function(message, callback) {
-    // Request parameters.
-    var currency = message.request.params.currency;
-
-    if (!currency) {
+    // Check required parameters.
+    var missing = Utils.checkRequired(REQUIRED_PARAMS, message.request.data);
+    if (missing.length > 0) {
       message.response = {
-        statusCode: 500,
+        statusCode: 400,
         statusText: 'REQUEST_NOT_VALID',
         data: {
-          message: 'Missing required data, must provide currency.'
+          message: 'The request does not include ' + missing.toString() + '.'
         }
       };
       return callback(message);
-    };
+    }
+
+    var currency = message.request.params.currency;
 
     coinbaseService.buyPrice(currency).then(function(response) {
 

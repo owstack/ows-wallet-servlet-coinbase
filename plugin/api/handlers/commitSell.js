@@ -1,27 +1,34 @@
 'use strict';
 
-angular.module('owsWalletPlugin.apiHandlers').service('commitSell', function(coinbaseService) {
+angular.module('owsWalletPlugin.apiHandlers').service('commitSell', function(coinbaseService,
+  /* @namespace owsWalletPluginClient.api */ Utils) {
 
 	var root = {};
 
+  var REQUIRED_PARAMS = [
+    'accountId',
+    'sellId'
+  ];
+
   root.respond = function(message, callback) {
-    // Request parameters.
+    // Check required parameters.
+    var missing = Utils.checkRequired(REQUIRED_PARAMS, message.request.params);
+    if (missing.length > 0) {
+      message.response = {
+        statusCode: 400,
+        statusText: 'REQUEST_NOT_VALID',
+        data: {
+          message: 'The request does not include ' + missing.toString() + '.'
+        }
+      };
+      return callback(message);
+    }
+
     var accountId = message.request.params.accountId;
     var sellId = message.request.params.sellId;
     var walletId = message.request.data.walletId;
     var amount = message.request.data.amount;
     var priceStopLimitAmount = message.request.data.priceStopLimitAmount;
-
-    if (!accountId || !sellId) {
-      message.response = {
-        statusCode: 500,
-        statusText: 'REQUEST_NOT_VALID',
-        data: {
-          message: 'Missing required data, must provide accountId and sellId.'
-        }
-      };
-      return callback(message);
-    };
 
       // If there is walletId then the commitment to sell is from a wallet, not a Coinbase account. The sell order
       // will be created after the wallet send to Coinbase account completes.

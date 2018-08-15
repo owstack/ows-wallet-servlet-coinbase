@@ -10,20 +10,19 @@ angular.module('owsWalletPlugin.apiHandlers').service('getCurrentUser', function
       auth: {}
     };
 
-    coinbaseService.getCurrentUser().then(function(response) {
-      data.user = response;
+    coinbaseService.getCurrentUser().then(function(user) {
+      data.user = user;
+      return coinbaseService.getUserAuth();
 
-      coinbaseService.getUserAuth().then(function(response) {
-        data.auth = response;
+    }).then(function(auth) {
+      data.auth = auth;
 
-        message.response = {
-          statusCode: 200,
-          statusText: 'OK',
-          data: data
-        };
-        return callback(message);
-
-      });
+      message.response = {
+        statusCode: 200,
+        statusText: 'OK',
+        data: data
+      };
+      return callback(message);
 
     }).catch(function(error) {
 

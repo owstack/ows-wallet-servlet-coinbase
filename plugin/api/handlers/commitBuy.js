@@ -1,26 +1,33 @@
 'use strict';
 
-angular.module('owsWalletPlugin.apiHandlers').service('commitBuy', function(coinbaseService) {
+angular.module('owsWalletPlugin.apiHandlers').service('commitBuy', function(coinbaseService,
+  /* @namespace owsWalletPluginClient.api */ Utils) {
 
 	var root = {};
 
+  var REQUIRED_PARAMS = [
+    'accountId',
+    'buyId'
+  ];
+
   root.respond = function(message, callback) {
-    // Request parameters.
+    // Check required parameters.
+    var missing = Utils.checkRequired(REQUIRED_PARAMS, message.request.params);
+    if (missing.length > 0) {
+      message.response = {
+        statusCode: 400,
+        statusText: 'REQUEST_NOT_VALID',
+        data: {
+          message: 'The request does not include ' + missing.toString() + '.'
+        }
+      };
+      return callback(message);
+    }
+
     var accountId = message.request.params.accountId;
     var buyId = message.request.params.buyId;
     var walletId = message.request.data.walletId;
     var priceStopLimitAmount = message.request.data.priceStopLimitAmount;
-
-    if (!accountId || !buyId) {
-      message.response = {
-        statusCode: 500,
-        statusText: 'REQUEST_NOT_VALID',
-        data: {
-          message: 'Missing required data, must provide accountId and buyId.'
-        }
-      };
-      return callback(message);
-    };
 
     // If this transaction should be monitored then capture the plugin id of the requestor for later notification.
     if (walletId) {

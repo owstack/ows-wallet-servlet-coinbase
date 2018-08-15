@@ -1,27 +1,32 @@
 'use strict';
 
-angular.module('owsWalletPlugin.apiHandlers').service('service', function(coinbaseService) {
+angular.module('owsWalletPlugin.apiHandlers').service('service', function(coinbaseService,
+  /* @namespace owsWalletPluginClient.api */ Utils) {
 
-	var root = {};
+  var root = {};
+
+  var REQUIRED_DATA = [
+    'state'
+  ];
 
   root.respond = function(message, callback) {
-    var clientId = message.header.clientId;
-
-    // Request parameters.
-    var state = message.request.data.state;
-    var oauthCode = message.request.data.oauthCode;
-    var pluginConfig = message.request.data.config;
-
-    if (!state || !clientId) {
+    // Check required parameters.
+    var missing = Utils.checkRequired(REQUIRED_DATA, message.request.data);
+    if (missing.length > 0) {
       message.response = {
-        statusCode: 500,
+        statusCode: 400,
         statusText: 'REQUEST_NOT_VALID',
         data: {
-          message: 'Missing required data, must provide state.'
+          message: 'The request does not include ' + missing.toString() + '.'
         }
       };
       return callback(message);
-    };
+    }
+
+    var clientId = message.header.clientId;
+    var state = message.request.data.state;
+    var oauthCode = message.request.data.oauthCode;
+    var pluginConfig = message.request.data.config;
 
     switch (state) {
       /**

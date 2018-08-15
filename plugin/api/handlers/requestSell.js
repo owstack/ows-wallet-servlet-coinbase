@@ -1,24 +1,30 @@
 'use strict';
 
-angular.module('owsWalletPlugin.apiHandlers').service('requestSell', function(coinbaseService) {
+angular.module('owsWalletPlugin.apiHandlers').service('requestSell', function(coinbaseService,
+  /* @namespace owsWalletPluginClient.api */ Utils) {
 
-	var root = {};
+  var root = {};
+
+  var REQUIRED_PARAMS = [
+    'accountId'
+  ];
 
   root.respond = function(message, callback) {
-    // Request parameters.
-    var accountId = message.request.params.accountId;
-    var data = message.request.data;
-
-    if (!accountId) {
+    // Check required parameters.
+    var missing = Utils.checkRequired(REQUIRED_PARAMS, message.request.params);
+    if (missing.length > 0) {
       message.response = {
-        statusCode: 500,
+        statusCode: 400,
         statusText: 'REQUEST_NOT_VALID',
         data: {
-          message: 'Missing required data, must provide accountId.'
+          message: 'The request does not include ' + missing.toString() + '.'
         }
       };
       return callback(message);
-    };
+    }
+
+    var accountId = message.request.params.accountId;
+    var data = message.request.data;
 
     coinbaseService.sellRequest(accountId, data).then(function(response) {
 
