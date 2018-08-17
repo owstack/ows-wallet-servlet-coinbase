@@ -58,7 +58,7 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
     statusText: 'UNAUTHORIZED_GRANT'
   }];
 
-  // Invoked via the servlet API to initialize our environment using the provided configuration (typically from applet plugin configuration).
+  // Invoked via the servlet API to initialize our environment using the provided configuration.
   root.init = function(clientId, config, oauthCode) {
     return new Promise(function(resolve, reject) {
 
