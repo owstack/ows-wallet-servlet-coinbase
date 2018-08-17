@@ -13,12 +13,11 @@
       "terms": "https://openwalletstack.org/terms",
       "git": "https://github.com/owstack/ows-wallet-servlet-coinbase/"
     },
-    "commitHash": "fc5ee2b"
+    "commitHash": "348361b"
   },
   "permissions": {
     "delete": false
   },
-  "linkHostCss": false,
   "galleryImage": "img/gallery.png",
   "previewImage": "img/preview.png",
   "iconImage": "img/icon.png",
