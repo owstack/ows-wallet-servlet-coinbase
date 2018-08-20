@@ -60,10 +60,8 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Account', function (loda
     this.orders = [];
     this.transactions = [];
 
-    // Set a sort order.
-    this.sort = lodash.find(coinbase.currencies, function(c) {
-      return c.code == self.currency.code;
-    }).sort;
+    // Set a UI sort order for this account.
+    this.sort = coinbase.preferredSort(self.currency.code);
 
     this.isCryptoCurrency = Constants.isCryptoCurrency(this.currency.code);
 

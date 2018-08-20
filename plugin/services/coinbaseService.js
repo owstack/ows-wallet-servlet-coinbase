@@ -1,6 +1,7 @@
 'use strict';
 
 angular.module('owsWalletPlugin.services').factory('coinbaseService', function($rootScope, $log, lodash,
+  /* @namespace owsWalletPluginClient.api */ Constants,
   /* @namespace owsWalletPluginClient.api */ Host,
   /* @namespace owsWalletPluginClient.api */ Http,
   /* @namespace owsWalletPluginClient.api */ Session,
@@ -18,21 +19,6 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
 
   var coinbaseApi;
   var coinbaseHost;
-
-  // Coinbase static configuration.
-  var currencies = [{
-    pair: 'BTC-USD',
-    label: 'Bitcoin'
-  }, {
-    pair: 'BCH-USD',
-    label: 'Bitcoin Cash'
-  }, {
-    pair: 'ETH-USD',
-    label: 'Ether'
-  }, {
-    pair: 'LTC-USD',
-    label: 'Litecoin'
-  }];
 
   // These errors from Coinbase indicate that the user is not authorized to access the Coinbase service.
   // A new token must be obtained to restore access.
@@ -272,9 +258,9 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
     });
   };
 
-  root.spotPrice = function() {
+  root.spotPrice = function(cryptoCurrencies) {
     return new Promise(function(resolve, reject) {
-      var count = currencies.length;
+      var count = cryptoCurrencies.length;
       var result = {};
 
       // Issue calls for each currency pair, resolve when all pair results have been returned. No reject() is called
@@ -289,11 +275,14 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
       //   }
       // }
       //   
-      lodash.forEach(currencies, function(c) {
+      lodash.forEach(cryptoCurrencies, function(c) {
 
-        coinbaseApi.get('prices/' + c.pair + '/spot').then(function(response) {
-          result[c.pair] = response.data.data;
-          result[c.pair].label = c.label; // As a convenience, add the label to the result.
+        var pair = c + '-USD';
+        var label = Constants.currencyMap(c, 'name');
+
+        coinbaseApi.get('prices/' + pair + '/spot').then(function(response) {
+          result[pair] = response.data.data;
+          result[pair].label = label; // As a convenience, add the label to the result.
 
           count--;
           if (count == 0) {
@@ -303,8 +292,8 @@ angular.module('owsWalletPlugin.services').factory('coinbaseService', function($
         }).catch(function(response) {
           getError(response, 'spotPrice');
 
-          result[c.pair] = {};
-          result[c.pair].error = error.message;
+          result[pair] = {};
+          result[pair].error = error.message;
 
           count--;
           if (count == 0) {

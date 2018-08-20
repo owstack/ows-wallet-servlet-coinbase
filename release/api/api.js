@@ -67,10 +67,8 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Account', ['lodash', 'Ap
     this.orders = [];
     this.transactions = [];
 
-    // Set a sort order.
-    this.sort = lodash.find(coinbase.currencies, function(c) {
-      return c.code == self.currency.code;
-    }).sort;
+    // Set a UI sort order for this account.
+    this.sort = coinbase.preferredSort(self.currency.code);
 
     this.isCryptoCurrency = Constants.isCryptoCurrency(this.currency.code);
 
@@ -366,10 +364,11 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Address', ['owsWalletPlu
 
 'use strict';
 
-angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', ['$log', 'lodash', 'ApiMessage', 'owsWalletPlugin.api.coinbase.Account', 'owsWalletPluginClient.api.ApiError', 'owsWalletPlugin.api.coinbase.CoinbaseServlet', 'owsWalletPlugin.api.coinbase.PaymentMethod', 'owsWalletPluginClient.api.PluginApiHelper', 'owsWalletPlugin.api.coinbase.User', function ($log, lodash, ApiMessage,
+angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', ['$log', 'lodash', 'ApiMessage', 'owsWalletPlugin.api.coinbase.Account', 'owsWalletPluginClient.api.ApiError', 'owsWalletPlugin.api.coinbase.CoinbaseServlet', 'owsWalletPluginClient.api.Constants', 'owsWalletPlugin.api.coinbase.PaymentMethod', 'owsWalletPluginClient.api.PluginApiHelper', 'owsWalletPlugin.api.coinbase.User', function ($log, lodash, ApiMessage,
   /* @namespace owsWalletPlugin.api.coinbase */ Account,
   /* @namespace owsWalletPluginClient.api */ ApiError,
   /* @namespace owsWalletPlugin.api.coinbase */ CoinbaseServlet,
+  /* @namespace owsWalletPluginClient.api */ Constants,
   /* @namespace owsWalletPlugin.api.coinbase */ PaymentMethod,
   /* @namespace owsWalletPluginClient.api */ PluginApiHelper,
   /* @namespace owsWalletPlugin.api.coinbase */ User) {
@@ -392,28 +391,15 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', ['$log', 'lod
     this.paymentMethods = [];
     this.urls = {};
 
-    // The collection of currencies offered by Coinbase as 'products'.
-    this.currencies = [{
-      code: 'USD',
-      name: 'US Dollar',
-      sort: 0
-    }, {
-      code: 'BTC',
-      name: 'Bitcoin',
-      sort: 1
-    }, {
-      code: 'BCH',
-      name: 'Bitcoin Cash',
-      sort: 2
-    }, {
-      code: 'ETH',
-      name: 'Ethereum',
-      sort: 3
-    }, {
-      code: 'LTC',
-      name: 'Litecoin',
-      sort: 4
-    }];
+    // A list of currencies supported by Coinbase with preferred sort order the UI.
+    var currencies = [
+      { code: 'USD', sort: 0 },
+      { code: 'BTC', sort: 1 },
+      { code: 'BCH', sort: 2 },
+      { code: 'ETH', sort: 3 },
+      { code: 'ETC', sort: 4 },
+      { code: 'LTC', sort: 5 }
+    ];
 
     var onCoinbaseLogin = onLogin;
     if (typeof onCoinbaseLogin != 'function') {
@@ -453,12 +439,6 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', ['$log', 'lod
       }).catch(function(error) {
         throw new ApiError(error);
         
-      });
-    };
-
-    this.getCurrencyByCode = function(code) {
-      return lodash.find(this.currencies, function(c) {
-        return c.code == code;
       });
     };
 
@@ -610,9 +590,16 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', ['$log', 'lod
     };
 
     this.spotPrice = function() {
+      var cryptoCurrencies = lodash.filter(currencies, function(c) {
+        return Constants.isCryptoCurrency(c.code);
+      });
+
       var request = {
         method: 'GET',
         url: apiRoot + '/prices/spot',
+        data: {
+          cryptoCurrencies: lodash.map(cryptoCurrencies, function(c) { return c.code; })
+        },
         opts: {
           cancelOn: [401]
         }
@@ -684,6 +671,15 @@ angular.module('owsWalletPlugin.api.coinbase').factory('Coinbase', ['$log', 'lod
         throw new ApiError(error);
         
       });
+    };
+
+
+    this.preferredSort = function(currency) {
+      var x = lodash.find(currencies, function(c) {
+        return c.code == currency;
+      });
+
+      return (x ? x.sort : 99); // If not found then put at end.
     };
 
     /**
